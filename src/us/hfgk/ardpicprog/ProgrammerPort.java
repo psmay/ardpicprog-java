@@ -11,21 +11,49 @@ public abstract class ProgrammerPort {
 	private static final Logger log = Logger.getLogger(ProgrammerPort.class.getName());
 
 	protected static final int BINARY_TRANSFER_MAX = 64;
+	protected static final int DEFAULT_TIMEOUT_SECONDS = 3;
+
 	protected int buflen;
 	protected int bufposn;
 	protected int timeoutSecs;
 	protected byte[] buffer = new byte[1024];
 
-	protected ProgrammerPort(int buflen, int bufposn, int timeoutSecs) {
-		this.buflen = buflen;
-		this.bufposn = bufposn;
+	protected ProgrammerPort(int timeoutSecs) {
+		this.buflen = 0;
+		this.bufposn = 0;
 		this.timeoutSecs = timeoutSecs;
-		log.info("Constructed with buflen=" + buflen + ", bufpos=" + bufposn + ", timeoutSecs=" + timeoutSecs);
 		init();
 	}
 
 	protected ProgrammerPort() {
-		this(0, 0, 3);
+		this(DEFAULT_TIMEOUT_SECONDS);
+	}
+
+	protected boolean pollVersion(int retry) throws IOException {
+		if (retry <= 0)
+			retry = 5;
+		while (retry > 0) {
+			log.fine("Requesting programmer version");
+			write("PROGRAM_PIC_VERSION\n");
+			log.finest("Waiting for programmer version");
+			String response = readProgrammerLine();
+			if (!Common.stringEmpty(response)) {
+				if (response.indexOf("ProgramPIC 1.") == 0) {
+					// We've found a version 1 sketch, which we can talk to.
+					log.fine("Found recognized programmer version");
+					return true;
+				} else if (response.indexOf("ProgramPIC ") == 0) {
+					// Version 2 or higher sketch - cannot talk to this.
+					log.fine("Found incompatible programmer version");
+					return false;
+				}
+			}
+
+			log.fine("Programmer did not respond with version");
+
+			--retry;
+		}
+		return (retry > 0);
 	}
 
 	private static boolean deviceNameMatch(String name1, String name2) {
@@ -90,6 +118,7 @@ public abstract class ProgrammerPort {
 				String devices = readMultiLineResponse();
 				msg += "Supported devices:\n" + devices + "* = autodetected";
 			} catch (IOException ee) {
+				msg += "Failed to list supported devices.";
 			}
 
 			throw new DeviceException(msg);
@@ -103,30 +132,31 @@ public abstract class ProgrammerPort {
 	// Sends a command to the sketch. Returns true if the response is "OK".
 	// Throws if the response is "ERROR" or a timeout occurred.
 	public void command(String cmd) throws IOException {
-		String line = cmd;
-		line += '\n';
+		String line = cmd + "\n";
 		byte[] lineBytes = asBytes(line);
+
+		log.fine("Command " + cmd + ": issuing");
 		write(lineBytes, lineBytes.length);
-		String response = readLine();
-		log.info("Line read by command: " + response);
-		while (response.equals("PENDING")) {
-			// int-running operation: sketch has asked for a inter timeout.
-			response = readLine();
-			log.info("Line read by command: " + response);
-		}
+
+		String response;
+
+		do {
+			log.finest("Command " + cmd + ": Reading result line");
+			response = readProgrammerLine();
+			log.finest("Command " + cmd + ": Read line '" + response + "'");
+		} while (response.equals("PENDING")); // int-running operation: sketch
+												// has asked for a inter
+												// timeout.
 		if (!response.equals("OK")) {
-			throw new CommandException("Response not OK: " + response);
+			throw new CommandException("Response to command '" + cmd + "' not OK: '" + response + "'");
 		}
+		log.fine("Command " + cmd + ": Got OK response");
 	}
 
 	// Returns a list of the available devices.
 	public String devices() throws IOException {
-		try {
-			command("DEVICES");
-			return readMultiLineResponse();
-		} catch (CommandException e) {
-			return "";
-		}
+		command("DEVICES");
+		return readMultiLineResponse();
 	}
 
 	public void readData(int start, int end, List<Short> data) throws IOException {
@@ -142,7 +172,7 @@ public abstract class ProgrammerPort {
 		command(strbuffer);
 
 		while (start <= end) {
-			int pktlen = readChar();
+			int pktlen = readProgrammerByte();
 			if (pktlen < 0)
 				throw new EOFException();
 			else if (pktlen == 0)
@@ -164,7 +194,7 @@ public abstract class ProgrammerPort {
 
 	private void read(byte[] data, int len, int offset) throws IOException {
 		while (len > 0) {
-			int ch = readChar();
+			int ch = readProgrammerByte();
 			if (ch == -1)
 				throw new EOFException();
 			data[offset++] = (byte) (0xFF & ch);
@@ -176,7 +206,7 @@ public abstract class ProgrammerPort {
 		read(data, len, 0);
 	}
 
-	private int readChar() throws IOException {
+	private int readProgrammerByte() throws IOException {
 		if (bufposn >= buflen) {
 			if (!fillBuffer())
 				return -1;
@@ -184,13 +214,13 @@ public abstract class ProgrammerPort {
 		return buffer[bufposn++] & 0xFF;
 	}
 
-	private String readLine() throws IOException {
+	private String readProgrammerLine() throws IOException {
 		String line = "";
 		int ch;
 
 		boolean timedOut = false;
 
-		while ((ch = readChar()) != -1) {
+		while ((ch = readProgrammerByte()) != -1) {
 			if (ch == 0x0A)
 				return line;
 			else if (ch != 0x0D && ch != 0x00)
@@ -208,7 +238,7 @@ public abstract class ProgrammerPort {
 		String response = "";
 		String line;
 		for (;;) {
-			line = readLine();
+			line = readProgrammerLine();
 			if (line == null || line.equals("."))
 				break;
 			response += line;
@@ -242,7 +272,7 @@ public abstract class ProgrammerPort {
 		String line;
 
 		for (;;) {
-			line = readLine();
+			line = readProgrammerLine();
 			if (line == null || line.equals("."))
 				break;
 			int index = line.indexOf(':');
@@ -257,6 +287,14 @@ public abstract class ProgrammerPort {
 	}
 
 	protected abstract void write(byte[] packet, int len) throws IOException;
+
+	protected void write(byte[] data) throws IOException {
+		write(data, data.length);
+	}
+
+	protected void write(String data) throws IOException {
+		write(asBytes(data));
+	}
 
 	protected abstract boolean fillBuffer() throws IOException;
 
@@ -313,7 +351,7 @@ public abstract class ProgrammerPort {
 
 	private void writePacket(byte[] packet, int len) throws IOException {
 		write(packet, len);
-		String response = readLine();
+		String response = readProgrammerLine();
 		if (!response.equals("OK"))
 			throw new PacketResponseException();
 	}
@@ -429,6 +467,47 @@ public abstract class ProgrammerPort {
 		public DeviceException(Throwable cause) {
 			super(cause);
 		}
+
+	}
+
+	public static class EraseException extends CommandException {
+		private static final long serialVersionUID = 1L;
+
+		public EraseException() {
+			super();
+		}
+
+		public EraseException(String message, Throwable cause) {
+			super(message, cause);
+		}
+
+		public EraseException(String message) {
+			super(message);
+		}
+
+		public EraseException(Throwable cause) {
+			super(cause);
+		}
+	}
+
+	public static class PortSetupException extends ProgrammerException {
+		public PortSetupException() {
+			super();
+		}
+
+		public PortSetupException(String message, Throwable cause) {
+			super(message, cause);
+		}
+
+		public PortSetupException(String message) {
+			super(message);
+		}
+
+		public PortSetupException(Throwable cause) {
+			super(cause);
+		}
+
+		private static final long serialVersionUID = 1L;
 
 	}
 }

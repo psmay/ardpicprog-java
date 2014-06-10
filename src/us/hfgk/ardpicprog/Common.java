@@ -52,40 +52,25 @@ abstract class Common {
 	public static String toStrictX2(int value) {
 		return Integer.toString(0x100 | (value & 0xFF), 16).substring(1).toUpperCase();
 	}
-	
-	private static final byte[] hexAscii = new byte[] {
-		(byte)'0',
-		(byte)'1',
-		(byte)'2',
-		(byte)'3',
-		(byte)'4',
-		(byte)'5',
-		(byte)'6',
-		(byte)'7',
-		(byte)'8',
-		(byte)'9',
-		(byte)'A',
-		(byte)'B',
-		(byte)'C',
-		(byte)'D',
-		(byte)'E',
-		(byte)'F'
-	};
-	
+
+	private static final byte[] hexAscii = new byte[] { (byte) '0', (byte) '1', (byte) '2', (byte) '3', (byte) '4',
+			(byte) '5', (byte) '6', (byte) '7', (byte) '8', (byte) '9', (byte) 'A', (byte) 'B', (byte) 'C', (byte) 'D',
+			(byte) 'E', (byte) 'F' };
+
 	static byte[] toStrictX2Bytes(byte[] src, int srcStart, int srcLength) {
 		byte[] output = new byte[srcLength * 2];
 		toStrictX2Into(src, srcStart, srcLength, output, 0);
 		return output;
 	}
-	
+
 	static void toStrictX2Into(byte[] src, int srcStart, int srcLength, byte[] dst, int dstStart) {
-		for(int i = 0; i < srcLength; ++i) {
-			int dstIndex = dstStart + (2*i);
+		for (int i = 0; i < srcLength; ++i) {
+			int dstIndex = dstStart + (2 * i);
 			dst[dstIndex] = hexAscii[(src[i] & 0xF0) >> 4];
-			dst[dstIndex+1] = hexAscii[(src[i] & 0x0F)];
+			dst[dstIndex + 1] = hexAscii[(src[i] & 0x0F)];
 		}
 	}
-	
+
 	private static String toX4Once(int value) {
 		if (value == (value & 0xFFFF)) {
 			return Integer.toString(0x10000 | value, 16).substring(1).toUpperCase();
@@ -93,7 +78,7 @@ abstract class Common {
 			return Integer.toString(value, 16).toUpperCase();
 		}
 	}
-	
+
 	private static String[] toX4Array(int... values) {
 		String[] results = new String[values.length];
 		for (int i = 0; i < values.length; ++i) {
@@ -109,7 +94,7 @@ abstract class Common {
 	public static String toX4(int... values) {
 		return toX4(" ", values);
 	}
-	
+
 	static void linesToOut(String... lines) {
 		for (String line : lines) {
 			System.out.println(line);
@@ -591,8 +576,6 @@ abstract class Common {
 			"Program, unless a warranty or assumption of liability accompanies a",
 			"copy of the Program in return for a fee." };
 
-
-
 	static void copying() {
 		linesToOut(copyingMessage);
 	}
@@ -604,11 +587,11 @@ abstract class Common {
 	static int parseInt(String string) {
 		return Integer.parseInt(string, 10);
 	}
-	
+
 	static int parseInt(String string, int defaultValue) {
 		try {
 			return Integer.parseInt(string, 10);
-		} catch(NumberFormatException e) {
+		} catch (NumberFormatException e) {
 			return defaultValue;
 		}
 	}
@@ -616,9 +599,8 @@ abstract class Common {
 	static InputStream openForRead(String input) throws FileNotFoundException {
 		return new BufferedInputStream(new FileInputStream(input));
 	}
-	
-	static  OutputStream openForWrite(String filename)
-			throws FileNotFoundException {
+
+	static OutputStream openForWrite(String filename) throws FileNotFoundException {
 		return new BufferedOutputStream(new FileOutputStream(filename));
 
 	}

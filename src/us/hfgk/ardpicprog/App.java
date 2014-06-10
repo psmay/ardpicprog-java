@@ -45,11 +45,11 @@ public class App {
 	public static final String ARDPICPROG_VERSION = "0.1.2";
 
 	private String programName = "ardpicprog";
-	
+
 	public App(String[] args) {
 		Options options = new Options();
 
-		log.info(options.port);
+		// log.info(options.port);
 
 		try {
 			if (!parseCommandLineOptions(args, programName, options))
@@ -71,7 +71,8 @@ public class App {
 		} catch (ProgrammerException e) {
 			fatalExit(e, 74);
 		} catch (IOException e) {
-			fatalExit(e, 66); // FIXME should be only on failure to open input file or saveCC
+			fatalExit(e, 66); // FIXME should be only on failure to open input
+								// file or saveCC
 		}
 	}
 
@@ -121,14 +122,13 @@ public class App {
 	public static void main(String[] args) {
 		new App(args);
 	}
-	
+
 	private void fatalExit(Exception e, int exitCode) {
 		log.severe(programName + ": " + e.getMessage());
 		System.exit(exitCode);
 	}
 
-	private boolean parseCommandLineOptions(String[] args, String programName, Options options)
-			throws UsageException {
+	private boolean parseCommandLineOptions(String[] args, String programName, Options options) throws UsageException {
 
 		Getopt g = new Getopt(programName, args, "c:d:hi:o:p:q", longOptions);
 
@@ -250,48 +250,61 @@ public class App {
 
 	private void runWithOptions(Options options) throws IOException, FileNotFoundException {
 		// Try to open the serial port and initialize the programmer.
-		ProgrammerPort port = Actions.getProgrammerPort(options.port, options.speed);
+		ProgrammerPort port = null;
 
-		// Does the user want to list the available devices?
-		if (options.listDevices) {
-			Actions.doListDevices(port);
-			return;
-		}
+		try {
+			port = Actions.getProgrammerPort(options.port, options.speed);
 
-		// Initialize the device.
-		Map<String, String> details = port.initDevice(options.device);
+			// Does the user want to list the available devices?
+			if (options.listDevices) {
+				Actions.doListDevices(port);
+				return;
+			}
 
-		// Copy the device details into the hex file object.
-		HexFile hexFile = Actions.getHexFile(options, details);
+			// Initialize the device.
+			Map<String, String> details = port.initDevice(options.device);
 
-		// Dump the type of device and how much memory it has.
-		Actions.describeHexFileDevice(hexFile);
+			// Copy the device details into the hex file object.
+			HexFile hexFile = Actions.getHexFile(options, details);
 
-		// Read the input file.
-		if (!Common.stringEmpty(options.input)) {
-			Actions.doInput(options, hexFile);
-		}
+			// Dump the type of device and how much memory it has.
+			Actions.describeHexFileDevice(hexFile);
 
-		// Copy the input to the CC output file.
-		if (!Common.stringEmpty(options.ccOutput)) {
-			Actions.doCCOutput(options, hexFile);
-		}
+			// Read the input file.
+			if (!Common.stringEmpty(options.input)) {
+				Actions.doInput(options, hexFile);
+			}
 
-		// Erase the device if necessary. If --force-calibration is specified
-		// and we have an input that includes calibration information, then use
-		// the "NOPRESERVE" option when erasing.
-		if (options.erase) {
-			Actions.doErase(options, port, hexFile);
-		}
+			// Copy the input to the CC output file.
+			if (!Common.stringEmpty(options.ccOutput)) {
+				Actions.doCCOutput(options, hexFile);
+			}
 
-		// Burn the input file into the device if requested.
-		if (options.burn) {
-			Actions.doBurn(options, port, hexFile);
-		}
+			// Erase the device if necessary. If --force-calibration is
+			// specified
+			// and we have an input that includes calibration information, then
+			// use
+			// the "NOPRESERVE" option when erasing.
+			if (options.erase) {
+				Actions.doErase(options, port, hexFile);
+			}
 
-		// If we have an output file, then read the contents of the PIC into it.
-		if (!Common.stringEmpty(options.output)) {
-			Actions.doOutput(options, port, hexFile);
+			// Burn the input file into the device if requested.
+			if (options.burn) {
+				Actions.doBurn(options, port, hexFile);
+			}
+
+			// If we have an output file, then read the contents of the PIC into
+			// it.
+			if (!Common.stringEmpty(options.output)) {
+				Actions.doOutput(options, port, hexFile);
+			}
+		} finally {
+			if (port != null) {
+				log.info("Closing programmer...");
+				port.close();
+			}
+			log.info("Done");
 		}
 	}
 
