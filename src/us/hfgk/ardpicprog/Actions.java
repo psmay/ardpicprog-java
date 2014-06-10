@@ -63,13 +63,14 @@ public class Actions {
 		hexFile.save(options.output, options.skipOnes);
 	}
 
-	static ProgrammerPort getSerialPort(String port, int speed) throws IOException {
+	static ProgrammerPort getProgrammerPort(String port, int speed) throws IOException {
+		log.info("Initializing programmer ...");
 		ProgrammerPort sp = new RxTxProgrammerPort();
 		sp.open(port, speed);
 		return sp;
 	}
 
-	static void readOutHexFileDevice(HexFile hexFile) {
+	static void describeHexFileDevice(HexFile hexFile) {
 		log.info("Device " + hexFile.deviceName() + ", program memory: "
 		+ hexFile.programSizeWords() + " words, data memory: "
 		+ hexFile.dataSizeBytes() + " bytes.");

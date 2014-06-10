@@ -5,9 +5,11 @@ This is a port of the host program from [rweather's
 ardpicprog](https://github.com/rweather/ardpicprog) to Java.
 
 Some refactoring has taken place with the objective of clarifying the
-code. It may be too early to tell if this effort is successful. Most of
-the guts haven't been extensively touched, other than to make the
-original C++ look enough like Java to compile.
+code and applying modern idioms (such as replacing some of the extensive
+return value checking with exceptions). It may be too early to tell if
+this effort is successful. Most of the guts haven't been extensively
+touched, other than to make the original C++ look enough like Java to
+compile.
 
 The code has not been thoroughly tested.
 
@@ -48,6 +50,19 @@ If you have access to both this software and the original `ardpicprog`
 host, I'd like to hear how my version stacks up. If you think you've
 found a bug, please [post an issue on
 GitHub](https://github.com/psmay/ardpicprog-java/issues/new).
+
+Python
+------
+
+This project actually constitutes the first of a two-step process to
+port ardpicprog to Python. I'm looking to provide an implementation
+that's easy for novices to hack on while still likely to work on
+multiple platforms. I picked Java because it has strong static typing
+and other features that help keep my mistakes in compile time rather
+than run time, and because much of the original C++ code is just a few
+string replaces away from being valid Java. Once the codebase is working
+in Java, refactoring tools can be used to make the code Python-like
+enough to serve as a useful basis for porting.
 
 License
 -------

@@ -9,7 +9,7 @@ import java.util.logging.Logger;
 
 public abstract class ProgrammerPort {
 	private static final Logger log = Logger.getLogger(ProgrammerPort.class.getName());
-	
+
 	protected static final int BINARY_TRANSFER_MAX = 64;
 	protected int buflen;
 	protected int bufposn;
@@ -38,7 +38,7 @@ public abstract class ProgrammerPort {
 		try {
 			command("DEVICE");
 		} catch (IOException e) {
-			throw new ProgrammerException(
+			throw new DeviceException(
 					"No device in programmer or programming voltage not available: " + e.getMessage(), e);
 		}
 
@@ -59,8 +59,7 @@ public abstract class ProgrammerPort {
 
 			it = details.get("DeviceID");
 			if (it == null || !it.equals("0000")) {
-				throw new ProgrammerException("Expecting " + deviceName + " but found "
-						+ it + " in the programmer");
+				throw new DeviceException("Expecting " + deviceName + " but found " + it + " in the programmer");
 			}
 		}
 
@@ -68,15 +67,13 @@ public abstract class ProgrammerPort {
 		// a device identifier, but it is not supported by the programmer.
 		it = details.get("DeviceID");
 		if (it != null && !it.equals("0000")) {
-			throw new ProgrammerException("Unsupported device in programmer, ID = "
-					+ it);
+			throw new DeviceException("Unsupported device in programmer, ID = " + it);
 		}
 
 		// If the user wanted to auto-detect the device type, then fail now
 		// because we don't know what we have in the socket.
 		if (deviceName.isEmpty() || deviceName.equals("auto")) {
-			throw new IOException(
-					"Cannot autodetect: device in programmer does not have an identifier.");
+			throw new DeviceException("Cannot autodetect: device in programmer does not have an identifier.");
 		}
 
 		// Try using "SETDEVICE" to manually select the device.
@@ -87,8 +84,7 @@ public abstract class ProgrammerPort {
 		} catch (IOException e) {
 			// The device is not supported. Print a list of all supported
 			// devices.
-			String msg = "Device " + deviceName
-					+ " is not supported by the programmer.";
+			String msg = "Device " + deviceName + " is not supported by the programmer.";
 			try {
 				command("DEVICES");
 				String devices = readMultiLineResponse();
@@ -96,7 +92,7 @@ public abstract class ProgrammerPort {
 			} catch (IOException ee) {
 			}
 
-			throw new ProgrammerException(msg);
+			throw new DeviceException(msg);
 		}
 	}
 
@@ -133,18 +129,15 @@ public abstract class ProgrammerPort {
 		}
 	}
 
-	public void readData(int start, int end, List<Short> data)
-			throws IOException {
+	public void readData(int start, int end, List<Short> data) throws IOException {
 		readData(start, end, data, 0);
 	}
 
 	// Reads a large block of data using "READBIN".
-	public void readData(int start, int end, List<Short> data, int offset)
-			throws IOException {
+	public void readData(int start, int end, List<Short> data, int offset) throws IOException {
 		byte[] buffer = new byte[256];
 
-		String strbuffer = "READBIN " + Common.toX4(start) + "-"
-				+ Common.toX4(end);
+		String strbuffer = "READBIN " + Common.toX4(start) + "-" + Common.toX4(end);
 
 		command(strbuffer);
 
@@ -159,9 +152,7 @@ public abstract class ProgrammerPort {
 			if ((numWords) > (end - start + 1))
 				numWords = end - start + 1;
 			for (int index = 0; index < numWords; ++index) {
-				data.set(
-						offset + index,
-						(short) ((buffer[index * 2] & 0xFF) | ((buffer[index * 2 + 1] & 0xFF) << 8)));
+				data.set(offset + index, (short) ((buffer[index * 2] & 0xFF) | ((buffer[index * 2 + 1] & 0xFF) << 8)));
 			}
 			offset += numWords;
 			start += numWords;
@@ -256,8 +247,7 @@ public abstract class ProgrammerPort {
 				break;
 			int index = line.indexOf(':');
 			if (index >= 0) {
-				response.put(trim(line.substring(0, index)),
-						trim(line.substring(index + 1)));
+				response.put(trim(line.substring(0, index)), trim(line.substring(index + 1)));
 			}
 		}
 		return response;
@@ -283,8 +273,7 @@ public abstract class ProgrammerPort {
 
 	protected abstract void closeDevice() throws IOException;
 
-	public void writeData(int start, int end, ArrayList<Short> data,
-			int offset, boolean force) throws IOException {
+	public void writeData(int start, int end, ArrayList<Short> data, int offset, boolean force) throws IOException {
 		byte[] buffer = new byte[BINARY_TRANSFER_MAX + 1];
 		int len = (end - start + 1) * 2;
 		int index;
@@ -292,14 +281,11 @@ public abstract class ProgrammerPort {
 		if (len == 10) {
 			// Cannot use "WRITEBIN" for exactly 10 bytes, so use "WRITE"
 			// instead.
-			command("WRITE "
-					+ (force ? "FORCE " : "")
-					+ Common.toX4(start, data.get(0), data.get(1),
-							data.get(2), data.get(3), data.get(4)));
+			command("WRITE " + (force ? "FORCE " : "")
+					+ Common.toX4(start, data.get(0), data.get(1), data.get(2), data.get(3), data.get(4)));
 		}
 
-		command("WRITEBIN " + (force ? "FORCE " : "")
-				+ Common.toX4(start));
+		command("WRITEBIN " + (force ? "FORCE " : "") + Common.toX4(start));
 		while (len >= BINARY_TRANSFER_MAX) {
 			buffer[0] = (byte) BINARY_TRANSFER_MAX;
 			for (index = 0; index < BINARY_TRANSFER_MAX; index += 2) {
@@ -425,4 +411,24 @@ public abstract class ProgrammerPort {
 
 	}
 
+	public static class DeviceException extends ProgrammerException {
+		private static final long serialVersionUID = 1L;
+
+		public DeviceException() {
+			super();
+		}
+
+		public DeviceException(String message, Throwable cause) {
+			super(message, cause);
+		}
+
+		public DeviceException(String message) {
+			super(message);
+		}
+
+		public DeviceException(Throwable cause) {
+			super(cause);
+		}
+
+	}
 }

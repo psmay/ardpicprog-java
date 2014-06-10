@@ -8,6 +8,10 @@ import java.io.IOException;
 import java.util.Map;
 import java.util.logging.Logger;
 
+import us.hfgk.ardpicprog.HexFile.HexFileException;
+import us.hfgk.ardpicprog.ProgrammerPort.DeviceException;
+import us.hfgk.ardpicprog.ProgrammerPort.ProgrammerException;
+
 public class App {
 	private static final Logger log = Logger.getLogger(App.class.getName());
 
@@ -40,36 +44,67 @@ public class App {
 
 	public static final String ARDPICPROG_VERSION = "0.1.2";
 
-	private static void semanticOptionValidation(String programName, Options options) throws UsageException {
+	private String programName = "ardpicprog";
+	
+	public App(String[] args) {
+		Options options = new Options();
+
+		log.info(options.port);
+
+		try {
+			if (!parseCommandLineOptions(args, programName, options))
+				return;
+
+			// Print the header.
+			if (!options.quiet)
+				header();
+
+			semanticOptionValidation(options);
+
+			runWithOptions(options);
+		} catch (UsageException e) {
+			fatalExit(e, 64);
+		} catch (HexFileException e) {
+			fatalExit(e, 65);
+		} catch (DeviceException e) {
+			fatalExit(e, 76);
+		} catch (ProgrammerException e) {
+			fatalExit(e, 74);
+		} catch (IOException e) {
+			fatalExit(e, 66); // FIXME should be only on failure to open input file or saveCC
+		}
+	}
+
+	private void semanticOptionValidation(Options options) throws UsageException {
 		// Bail out if we don't at least have -i, -o, --erase, or
 		// --list-devices.
-		if (Common.stringEmpty(options.input) && Common.stringEmpty(options.output) && !options.erase && !options.listDevices) {
-			dieUsage(programName, "One of -i, -o, --erase, or --list-devices is required");
+		if (Common.stringEmpty(options.input) && Common.stringEmpty(options.output) && !options.erase
+				&& !options.listDevices) {
+			dieUsage("One of -i, -o, --erase, or --list-devices is required");
 		}
 
 		// Cannot use -c without -i.
 		if (!Common.stringEmpty(options.ccOutput) && Common.stringEmpty(options.input)) {
-			dieUsage(programName, "Cannot use --cc-hexfile without also specifying --input-hexfile");
+			dieUsage("Cannot use --cc-hexfile without also specifying --input-hexfile");
 		}
 
 		// If we have -i, but no -c or --burn, then report an error.
 		if (!Common.stringEmpty(options.input) && Common.stringEmpty(options.ccOutput) && !options.burn) {
-			dieUsage(programName, "Cannot use --input-hexfile without also specifying --cc-hexfile or --burn");
+			dieUsage("Cannot use --input-hexfile without also specifying --cc-hexfile or --burn");
 		}
 
 		// Cannot use --burn without -i.
 		if (options.burn && Common.stringEmpty(options.input)) {
-			dieUsage(programName, "Cannot use --burn without also specifying --input-hexfile");
+			dieUsage("Cannot use --burn without also specifying --input-hexfile");
 		}
 
 		// Will need --burn if doing --force-calibration.
 		if (options.forceCalibration && !options.burn) {
-			dieUsage(programName, "Cannot use --force-calibration without also specifying --burn");
+			dieUsage("Cannot use --force-calibration without also specifying --burn");
 		}
 	}
 
-
-	private static void dieUsage(String programName, String message) throws UsageException {
+	private void dieUsage(String message) throws UsageException {
 		usage(programName);
 		throw new UsageException(message);
 	}
@@ -83,32 +118,16 @@ public class App {
 				"type `ardpicprog --copying' for details.", "");
 	}
 
-	public static void main(String[] args) throws IOException {
-		String programName = "ardpicprog";
-
-		Options options = new Options();
-
-		log.info(options.port);
-
-		try {
-		if (!parseCommandLineOptions(args, programName, options))
-			return;
-
-		// Print the header.
-		if (!options.quiet)
-			header();
-
-		semanticOptionValidation(programName, options);
-		}
-		catch(UsageException e) {
-			System.err.println(programName + ": " + e.getMessage());
-			System.exit(1);
-		}
-
-		App.runWithOptions(options);
+	public static void main(String[] args) {
+		new App(args);
+	}
+	
+	private void fatalExit(Exception e, int exitCode) {
+		log.severe(programName + ": " + e.getMessage());
+		System.exit(exitCode);
 	}
 
-	private static boolean parseCommandLineOptions(String[] args, String programName, Options options)
+	private boolean parseCommandLineOptions(String[] args, String programName, Options options)
 			throws UsageException {
 
 		Getopt g = new Getopt(programName, args, "c:d:hi:o:p:q", longOptions);
@@ -186,8 +205,8 @@ public class App {
 				// Display the help message and exit.
 				if (!options.quiet)
 					header();
-				
-				dieUsage(programName, "Unrecognized command line option: " + opt + " (" + ((char)opt) + ")");
+
+				dieUsage("Unrecognized command line option: " + opt + " (" + ((char) opt) + ")");
 			}
 		}
 
@@ -229,10 +248,9 @@ public class App {
 				"    --erase --burn --force-calibration --list-devices --speed SPEED");
 	}
 
-	static void runWithOptions(Options options) throws IOException, FileNotFoundException {
+	private void runWithOptions(Options options) throws IOException, FileNotFoundException {
 		// Try to open the serial port and initialize the programmer.
-		log.info("Initializing programmer ...");
-		ProgrammerPort port = Actions.getSerialPort(options.port, options.speed);
+		ProgrammerPort port = Actions.getProgrammerPort(options.port, options.speed);
 
 		// Does the user want to list the available devices?
 		if (options.listDevices) {
@@ -247,7 +265,7 @@ public class App {
 		HexFile hexFile = Actions.getHexFile(options, details);
 
 		// Dump the type of device and how much memory it has.
-		Actions.readOutHexFileDevice(hexFile);
+		Actions.describeHexFileDevice(hexFile);
 
 		// Read the input file.
 		if (!Common.stringEmpty(options.input)) {
