@@ -13,6 +13,7 @@ import us.hfgk.ardpicprog.ProgrammerPort.DeviceException;
 import us.hfgk.ardpicprog.ProgrammerPort.ProgrammerException;
 
 public class App {
+
 	private static final Logger log = Logger.getLogger(App.class.getName());
 
 	static class Options {
@@ -28,6 +29,7 @@ public class App {
 		boolean burn = false;
 		boolean forceCalibration = false;
 		boolean listDevices = false;
+		boolean describeDevice = false;
 		int speed = 9600;
 
 		public Options() {
@@ -40,6 +42,26 @@ public class App {
 			env = System.getenv("PIC_PORT");
 			port = Common.stringEmpty(env) ? RxTxProgrammerPort.getDefaultPicPort() : env;
 		}
+
+		public static final char BURN = 'b';
+		public static final char CC_HEXFILE = 'c';
+		public static final char COPYING = 'C';
+		public static final char DEVICE = 'd';
+		public static final char ERASE = 'e';
+		public static final char FORCE_CALIBRATION = 'f';
+		public static final char HELP = 'h';
+		public static final char IGNORE = 'N';
+		public static final char INPUT_HEXFILE = 'i';
+		public static final char LIST_DEVICES = 'l';
+		public static final char OUTPUT_HEXFILE = 'o';
+		public static final char OUTPUT = 'o';
+		public static final char PIC_SERIAL_PORT = 'p';
+		public static final char PROGRAMMER_PORT = 'p';
+		public static final char QUIET = 'q';
+		public static final char SKIP_ONES = 's';
+		public static final char SPEED = 'S';
+		public static final char WARRANTY = 'w';
+		public static final int DESCRIBE = 0x100001;
 	}
 
 	public static final String ARDPICPROG_VERSION = "0.1.2";
@@ -80,8 +102,8 @@ public class App {
 		// Bail out if we don't at least have -i, -o, --erase, or
 		// --list-devices.
 		if (Common.stringEmpty(options.input) && Common.stringEmpty(options.output) && !options.erase
-				&& !options.listDevices) {
-			dieUsage("One of -i, -o, --erase, or --list-devices is required");
+				&& !options.listDevices && !options.describeDevice) {
+			dieUsage("One of -i, -o, --erase, --list-devices, or --describe is required");
 		}
 
 		// Cannot use -c without -i.
@@ -141,64 +163,71 @@ public class App {
 				// Set the hexfile format: IHX8M, IHX16, or IHX32.
 				options.format = opt;
 				break;
-			case 'b':
+			case Options.BURN:
 				// Burn the PIC.
 				options.burn = true;
 				break;
-			case 'c':
+			case Options.CC_HEXFILE:
 				// Set the name of the cc output hexfile.
 				options.ccOutput = g.getOptarg();
 				break;
-			case 'C':
+			case Options.COPYING:
 				// Display copying message.
 				Common.copying();
 				return false;
-			case 'd':
+			case Options.DESCRIBE:
+				// Describe the device.
+				options.describeDevice = true;
+				break;
+			case Options.DEVICE:
 				// Set the type of PIC device to program.
 				options.device = g.getOptarg();
 				break;
-			case 'e':
+			case Options.ERASE:
 				// Erase the PIC.
 				options.erase = true;
+				options.describeDevice = true;
 				break;
-			case 'f':
+			case Options.FORCE_CALIBRATION:
 				// Force reprogramming of the OSCCAL word from the hex file
 				// rather than by automatic preservation.
 				options.forceCalibration = true;
 				break;
-			case 'i':
+			case Options.INPUT_HEXFILE:
 				// Set the name of the input hexfile.
 				options.input = g.getOptarg();
+				options.describeDevice = true;
 				break;
-			case 'l':
+			case Options.LIST_DEVICES:
 				// List all devices that are supported by the programmer.
 				options.listDevices = true;
 				break;
-			case 'o':
+			case Options.OUTPUT:
 				// Set the name of the output hexfile.
 				options.output = g.getOptarg();
+				options.describeDevice = true;
 				break;
-			case 'p':
+			case Options.PROGRAMMER_PORT:
 				// Set the serial port to use to access the programmer.
 				options.port = g.getOptarg();
 				break;
-			case 'q':
+			case Options.QUIET:
 				// Enable quiet mode.
 				options.quiet = true;
 				break;
-			case 's':
+			case Options.SKIP_ONES:
 				// Skip memory locations that are all-ones when reading.
 				options.skipOnes = true;
 				break;
-			case 'S':
+			case Options.SPEED:
 				// Set the speed for the serial connection.
 				options.speed = Common.parseInt(g.getOptarg());
 				break;
-			case 'w':
+			case Options.WARRANTY:
 				// Display warranty message.
 				Common.warranty();
 				return false;
-			case 'N':
+			case Options.IGNORE:
 				// Option that is ignored for backwards compatibility.
 				break;
 			default:
@@ -213,32 +242,40 @@ public class App {
 		return true;
 	}
 
-	private static final LongOpt[] longOptions = new LongOpt[] { new LongOpt("burn", LongOpt.NO_ARGUMENT, null, 'b'),
-			new LongOpt("cc-hexfile", LongOpt.REQUIRED_ARGUMENT, null, 'c'),
-			new LongOpt("copying", LongOpt.NO_ARGUMENT, null, 'C'),
-			new LongOpt("device", LongOpt.REQUIRED_ARGUMENT, null, 'd'),
-			new LongOpt("erase", LongOpt.NO_ARGUMENT, null, 'e'),
-			new LongOpt("force-calibration", LongOpt.NO_ARGUMENT, null, 'f'),
-			new LongOpt("help", LongOpt.NO_ARGUMENT, null, 'h'),
+	private static final LongOpt[] longOptions = new LongOpt[] {
+			new LongOpt("burn", LongOpt.NO_ARGUMENT, null, Options.BURN),
+			new LongOpt("cc-hexfile", LongOpt.REQUIRED_ARGUMENT, null, Options.CC_HEXFILE),
+			new LongOpt("copying", LongOpt.NO_ARGUMENT, null, Options.COPYING),
+			new LongOpt("device", LongOpt.REQUIRED_ARGUMENT, null, Options.DEVICE),
+			new LongOpt("describe", LongOpt.NO_ARGUMENT, null, Options.DESCRIBE),
+			new LongOpt("erase", LongOpt.NO_ARGUMENT, null, Options.ERASE),
+			new LongOpt("force-calibration", LongOpt.NO_ARGUMENT, null, Options.FORCE_CALIBRATION),
+			new LongOpt("help", LongOpt.NO_ARGUMENT, null, Options.HELP),
 			new LongOpt("ihx8m", LongOpt.NO_ARGUMENT, null, HexFile.FORMAT_IHX8M),
 			new LongOpt("ihx16", LongOpt.NO_ARGUMENT, null, HexFile.FORMAT_IHX16),
 			new LongOpt("ihx32", LongOpt.NO_ARGUMENT, null, HexFile.FORMAT_IHX32),
-			new LongOpt("input-hexfile", LongOpt.REQUIRED_ARGUMENT, null, 'i'),
-			new LongOpt("output-hexfile", LongOpt.REQUIRED_ARGUMENT, null, 'o'),
-			new LongOpt("pic-serial-port", LongOpt.REQUIRED_ARGUMENT, null, 'p'),
-			new LongOpt("quiet", LongOpt.NO_ARGUMENT, null, 'q'),
-			new LongOpt("skip-ones", LongOpt.NO_ARGUMENT, null, 's'),
-			new LongOpt("warranty", LongOpt.NO_ARGUMENT, null, 'w'),
+			new LongOpt("input-hexfile", LongOpt.REQUIRED_ARGUMENT, null, Options.INPUT_HEXFILE),
+			new LongOpt("output-hexfile", LongOpt.REQUIRED_ARGUMENT, null, Options.OUTPUT_HEXFILE),
+			new LongOpt("pic-serial-port", LongOpt.REQUIRED_ARGUMENT, null, Options.PIC_SERIAL_PORT),
+			new LongOpt("quiet", LongOpt.NO_ARGUMENT, null, Options.QUIET),
+			new LongOpt("skip-ones", LongOpt.NO_ARGUMENT, null, Options.SKIP_ONES),
+			new LongOpt("warranty", LongOpt.NO_ARGUMENT, null, Options.WARRANTY),
 
-			/* The following are ignored - backwards compatibility with picprog */
-			new LongOpt("jdm", LongOpt.NO_ARGUMENT, null, 'N'), new LongOpt("k8048", LongOpt.NO_ARGUMENT, null, 'N'),
-			new LongOpt("nordtsc", LongOpt.NO_ARGUMENT, null, 'N'),
-			new LongOpt("rdtsc", LongOpt.NO_ARGUMENT, null, 'N'),
-			new LongOpt("reboot", LongOpt.NO_ARGUMENT, null, 'N'), new LongOpt("slow", LongOpt.NO_ARGUMENT, null, 'N'),
+			/*
+			 * The following are ignored - backwards compatibility with picprog
+			 */
+			new LongOpt("jdm", LongOpt.NO_ARGUMENT, null, Options.IGNORE),
+			new LongOpt("k8048", LongOpt.NO_ARGUMENT, null, Options.IGNORE),
+			new LongOpt("nordtsc", LongOpt.NO_ARGUMENT, null, Options.IGNORE),
+			new LongOpt("rdtsc", LongOpt.NO_ARGUMENT, null, Options.IGNORE),
+			new LongOpt("reboot", LongOpt.NO_ARGUMENT, null, Options.IGNORE),
+			new LongOpt("slow", LongOpt.NO_ARGUMENT, null, Options.IGNORE),
 
-			/* These options are specific to ardpicprog - not present in picprog */
-			new LongOpt("list-devices", LongOpt.NO_ARGUMENT, null, 'l'),
-			new LongOpt("speed", LongOpt.REQUIRED_ARGUMENT, null, 'S') };
+			/*
+			 * These options are specific to ardpicprog - not present in picprog
+			 */
+			new LongOpt("list-devices", LongOpt.NO_ARGUMENT, null, Options.LIST_DEVICES),
+			new LongOpt("speed", LongOpt.REQUIRED_ARGUMENT, null, Options.SPEED) };
 
 	static void usage(String argv0) {
 		Common.notice("Usage: " + argv0 + " --quiet -q --warranty --copying --help -h",
@@ -268,7 +305,9 @@ public class App {
 			HexFile hexFile = Actions.getHexFile(options, details);
 
 			// Dump the type of device and how much memory it has.
-			Actions.describeHexFileDevice(hexFile);
+			if (options.describeDevice) {
+				Actions.describeHexFileDevice(hexFile);
+			}
 
 			// Read the input file.
 			if (!Common.stringEmpty(options.input)) {
