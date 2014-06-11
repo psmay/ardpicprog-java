@@ -5,7 +5,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.logging.Level;
 import java.util.logging.Logger;
 
 public abstract class ProgrammerPort {
@@ -349,6 +348,7 @@ public abstract class ProgrammerPort {
 	}
 
 	private void writePacket(byte[] packet, int len) throws IOException {
+		log.finest("Writing " + len + " byte(s) as packet");
 		write(packet, len);
 		String response = readProgrammerLine();
 		if (!response.equals("OK"))

@@ -18,6 +18,7 @@ public class App {
 	private static final Logger log = Logger.getLogger(App.class.getName());
 
 	static class Options {
+		public boolean blankCheck = false;
 		boolean quiet = false;
 		String device;
 		String port;
@@ -63,6 +64,7 @@ public class App {
 		public static final char SPEED = 'S';
 		public static final char WARRANTY = 'w';
 		public static final int DESCRIBE = 0x100001;
+		public static final int BLANK_CHECK = 0x100002;
 	}
 
 	public static final String ARDPICPROG_VERSION = "0.1.2";
@@ -103,8 +105,8 @@ public class App {
 		// Bail out if we don't at least have -i, -o, --erase, or
 		// --list-devices.
 		if (Common.stringEmpty(options.input) && Common.stringEmpty(options.output) && !options.erase
-				&& !options.listDevices && !options.describeDevice) {
-			dieUsage("One of -i, -o, --erase, --list-devices, or --describe is required");
+				&& !options.listDevices && !options.describeDevice &!options.blankCheck) {
+			dieUsage("One of -i, -o, --erase, --list-devices, --describe, --blank-check is required");
 		}
 
 		// Cannot use -c without -i.
@@ -167,6 +169,11 @@ public class App {
 			case HexFile.FORMAT_IHX32:
 				// Set the hexfile format: IHX8M, IHX16, or IHX32.
 				options.format = opt;
+				break;
+			case Options.BLANK_CHECK:
+				// Check if the device is blank.
+				options.blankCheck = true;
+				options.describeDevice = true;
 				break;
 			case Options.BURN:
 				// Burn the PIC.
@@ -248,6 +255,7 @@ public class App {
 	}
 
 	private static final LongOpt[] longOptions = new LongOpt[] {
+			new LongOpt("blank-check", LongOpt.NO_ARGUMENT, null, Options.BLANK_CHECK),
 			new LongOpt("burn", LongOpt.NO_ARGUMENT, null, Options.BURN),
 			new LongOpt("cc-hexfile", LongOpt.REQUIRED_ARGUMENT, null, Options.CC_HEXFILE),
 			new LongOpt("copying", LongOpt.NO_ARGUMENT, null, Options.COPYING),
@@ -314,6 +322,10 @@ public class App {
 				Actions.describeHexFileDevice(hexFile);
 			}
 
+			if(options.blankCheck) {
+				Actions.doBlankCheck(options, port, hexFile);
+			}
+			
 			// Read the input file.
 			if (!Common.stringEmpty(options.input)) {
 				Actions.doInput(options, hexFile);

@@ -57,6 +57,15 @@ public class Actions {
 		hexFile.read(port);
 		hexFile.save(options.output, options.skipOnes);
 	}
+	
+	public static void doBlankCheck(App.Options options, ProgrammerPort port, HexFile hexFile) throws IOException {
+		log.info("Checking whether device is blank");
+		if(hexFile.blankCheckRead(port)) {
+			log.info("Device appears to be blank");
+		} else {
+			log.info("Device appears to be NOT blank");
+		}
+	}
 
 	static ProgrammerPort getProgrammerPort(String port, int speed) throws IOException {
 		log.info("Initializing programmer ...");

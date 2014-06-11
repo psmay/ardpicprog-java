@@ -6,7 +6,6 @@ import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Map;
-import java.util.logging.Level;
 import java.util.logging.Logger;
 
 public class HexFile {
@@ -295,10 +294,12 @@ public class HexFile {
 			return (short) ((1 << _programBits) - 1);
 	}
 
+	private boolean wouldBeAllOnes(int address, short wordValue) {
+		return wordValue == fullWord(address);
+	}
+	
 	public boolean isAllOnes(int address) {
-		short allOnes;
-		allOnes = fullWord(address);
-		return word(address) == allOnes;
+		return wouldBeAllOnes(address, word(address));
 	}
 
 	public boolean canForceCalibration() {
@@ -319,6 +320,29 @@ public class HexFile {
 			log.info("Skipped reading " + areaDesc + ",");
 		}
 	}
+	
+	private boolean blankCheckPart(ProgrammerPort port, String areaDesc, IntPair range) throws IOException {
+		if (range.start <= range.end) {
+			log.info("Blank checking " + areaDesc + ",");
+			if(blankCheckBlock(port, range.start, range.end)) {
+				log.info("Looks blank");
+				return true;
+			}
+			else {
+				log.info("Looks non-blank");
+				return false;
+			}
+		} else {
+			log.info("Skipped blank checking " + areaDesc + ",");
+			return true;
+		}
+	}
+	
+	public boolean blankCheckRead(ProgrammerPort port) throws IOException {
+		return blankCheckPart(port, "program memory", _programRange) &&
+				blankCheckPart(port, "data memory", _dataRange) &&
+				blankCheckPart(port, "id words and fuses", _configRange);		
+	}
 
 	public void read(ProgrammerPort port) throws IOException {
 		blocks.clear();
@@ -328,7 +352,6 @@ public class HexFile {
 		readPart(port, "id words and fuses", _configRange);
 
 		log.info("done.");
-
 	}
 
 	private void readBlock(ProgrammerPort port, int start, int end) throws IOException {
@@ -347,6 +370,23 @@ public class HexFile {
 			}
 		}
 		blocks.add(block);
+	}
+
+	private boolean blankCheckBlock(ProgrammerPort port, int start, int end) throws IOException {
+		Block block = new Block();
+		block.address = start;
+		ensureAtLeast(block.data, (end - start + 1));
+		port.readData(start, end, block.data, 0);
+
+		int i = start;
+		for(short word : block.data){
+			if(!wouldBeAllOnes(i, word)) {
+				return false;
+			}
+			++i;
+		}
+		
+		return true;
 	}
 
 	private void ensureAtLeast(ArrayList<Short> data, int newSize) {
@@ -773,4 +813,6 @@ public class HexFile {
 		}
 
 	}
+
+
 }

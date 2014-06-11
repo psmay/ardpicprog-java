@@ -11,7 +11,6 @@ import java.nio.charset.Charset;
 import java.nio.charset.UnsupportedCharsetException;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.List;
 
 abstract class Common {
 	private Common() {
