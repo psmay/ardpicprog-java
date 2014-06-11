@@ -6,6 +6,7 @@ import gnu.getopt.LongOpt;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.Map;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import us.hfgk.ardpicprog.HexFile.HexFileException;
@@ -146,7 +147,11 @@ public class App {
 	}
 
 	private void fatalExit(Exception e, int exitCode) {
-		log.severe(programName + ": " + e.getMessage());
+		String message = e.getMessage();
+		if (message != null) {
+			log.severe(programName + ": " + message);
+		}
+		log.log(Level.SEVERE, programName + ": ", e);
 		System.exit(exitCode);
 	}
 
@@ -341,7 +346,11 @@ public class App {
 		} finally {
 			if (port != null) {
 				log.info("Closing programmer...");
-				port.close();
+				try {
+					port.close();
+				} catch (IOException e) {
+					log.warning("Problem while closing programmer port: " + e.getMessage());
+				}
 			}
 			log.info("Done");
 		}

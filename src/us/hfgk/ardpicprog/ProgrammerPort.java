@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
 public abstract class ProgrammerPort {
@@ -314,46 +315,44 @@ public abstract class ProgrammerPort {
 	public void writeData(int start, int end, ArrayList<Short> data, int offset, boolean force) throws IOException {
 		byte[] buffer = new byte[BINARY_TRANSFER_MAX + 1];
 		int len = (end - start + 1) * 2;
-		int index;
-		short word;
+
 		if (len == 10) {
 			// Cannot use "WRITEBIN" for exactly 10 bytes, so use "WRITE"
 			// instead.
-			command("WRITE " + (force ? "FORCE " : "")
-					+ Common.toX4(start, data.get(0), data.get(1), data.get(2), data.get(3), data.get(4)));
+			command("WRITE " + (force ? "FORCE " : "") + Common.toX4(start) + " " + Common.toX4(data.subList(0, 5)));
 		}
 
 		command("WRITEBIN " + (force ? "FORCE " : "") + Common.toX4(start));
 		while (len >= BINARY_TRANSFER_MAX) {
-			buffer[0] = (byte) BINARY_TRANSFER_MAX;
-			for (index = 0; index < BINARY_TRANSFER_MAX; index += 2) {
-				word = data.get(offset + index / 2);
-				buffer[offset + index + 1] = (byte) word;
-				buffer[offset + index + 2] = (byte) (word >> 8);
-			}
-			writePacket(buffer, BINARY_TRANSFER_MAX + 1);
+			bufferWords(data, offset, buffer, BINARY_TRANSFER_MAX);
 			offset += BINARY_TRANSFER_MAX / 2;
 			len -= BINARY_TRANSFER_MAX;
 		}
 		if (len > 0) {
-			buffer[0] = (byte) len;
-			for (index = 0; index < len; index += 2) {
-				word = data.get(offset + index / 2);
-				buffer[index + 1] = (byte) word;
-				buffer[index + 2] = (byte) (word >> 8);
-			}
-			writePacket(buffer, len + 1);
+			bufferWords(data, offset, buffer, len);
 		}
 		buffer[0] = (byte) 0x00; // Terminating packet.
 		writePacket(buffer, 1);
+	}
 
+	private int bufferWords(ArrayList<Short> data, int offset, byte[] buffer, int length) throws IOException {
+		int index;
+		short word;
+		buffer[0] = (byte) length;
+		for (index = 0; index < length; index += 2) {
+			word = data.get(offset + index / 2);
+			buffer[index + 1] = (byte) word;
+			buffer[index + 2] = (byte) (word >> 8);
+		}
+		writePacket(buffer, length + 1);
+		return index;
 	}
 
 	private void writePacket(byte[] packet, int len) throws IOException {
 		write(packet, len);
 		String response = readProgrammerLine();
 		if (!response.equals("OK"))
-			throw new PacketResponseException();
+			throw new PacketResponseException("Packet response was '" + response + "'; expected 'OK'");
 	}
 
 	public static class ProgrammerException extends IOException {

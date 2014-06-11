@@ -6,6 +6,7 @@ import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Map;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
 public class HexFile {
@@ -409,7 +410,7 @@ public class HexFile {
 						return; // ok
 					}
 				}
-				line = null;
+				line.clear();
 				startLine = true;
 				continue;
 			}

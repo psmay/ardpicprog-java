@@ -9,6 +9,9 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.charset.Charset;
 import java.nio.charset.UnsupportedCharsetException;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.List;
 
 abstract class Common {
 	private Common() {
@@ -24,6 +27,17 @@ abstract class Common {
 		}
 	}
 
+	public static String join(String sep, Collection<?> values) {
+		StringBuilder sb = new StringBuilder();
+		String prefix = "";
+		for(Object o : values) {
+			sb.append(prefix);
+			sb.append(String.valueOf(o));
+			prefix = sep;
+		}
+		return sb.toString();
+	}
+	
 	public static String join(String sep, Object... values) {
 		final int length = values.length;
 		switch (length) {
@@ -86,15 +100,73 @@ abstract class Common {
 		}
 		return results;
 	}
-
+	
+	private static String[] toX4Array(short... values) {
+		String[] results = new String[values.length];
+		for (int i = 0; i < values.length; ++i) {
+			results[i] = toX4Once(values[i]);
+		}
+		return results;
+	}
+	
+	public static short[] toShortArray(Collection<Short> numbers) {
+		short[] buffer = new short[numbers.size()];
+		int i = 0;
+		for(short n : numbers) {
+			if(i >= buffer.length) {
+				int newSize = numbers.size();
+				if(newSize <= i)
+					newSize = i + 1;
+				buffer = Arrays.copyOf(buffer, newSize);
+			}
+			buffer[i] = n;
+		}
+		if(buffer.length != i)
+			buffer = Arrays.copyOf(buffer, i);
+		return buffer;
+	}	
+	
+	public static int[] toIntArray(Collection<Integer> numbers) {
+		int[] buffer = new int[numbers.size()];
+		int i = 0;
+		for(int n : numbers) {
+			if(i >= buffer.length) {
+				int newSize = numbers.size();
+				if(newSize <= i)
+					newSize = i + 1;
+				buffer = Arrays.copyOf(buffer, newSize);
+			}
+			buffer[i] = n;
+		}
+		if(buffer.length != i)
+			buffer = Arrays.copyOf(buffer, i);
+		return buffer;
+	}
+	
 	public static String toX4(String sep, int... values) {
 		return join(sep, (Object[]) toX4Array(values));
+	}
+	
+	public static String toX4(String sep, short... values) {
+		return join(sep, (Object[]) toX4Array(values));
+	}
+	
+	public static String toX4(String sep, Collection<Short> values) {
+		return toX4(sep, toShortArray(values));
 	}
 
 	public static String toX4(int... values) {
 		return toX4(" ", values);
 	}
+	
+	public static String toX4(short... values) {
+		return toX4(" ", values);
+	}
 
+	public static String toX4(Collection<Short> values) {
+		return toX4(" ", values);
+	}
+	
 	static void linesToOut(String... lines) {
 		for (String line : lines) {
 			System.out.println(line);
@@ -614,5 +686,7 @@ abstract class Common {
 	static boolean stringEmpty(String s) {
 		return (s == null) || (s.isEmpty());
 	}
+
+
 
 }
