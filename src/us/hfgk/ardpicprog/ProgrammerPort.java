@@ -4,6 +4,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
@@ -185,6 +186,33 @@ public abstract class ProgrammerPort {
 		}
 	}
 
+	// Reads a large block of data using "READBIN".
+	public void readData(int start, int end, short[] data, int offset) throws IOException {
+		byte[] buffer = new byte[256];
+
+		commandReadBin((short) start, (short) end);
+
+		while (start <= end) {
+			int pktlen = readProgrammerByte();
+			if (pktlen < 0)
+				throw new EOFException();
+			else if (pktlen == 0)
+				break;
+			read(buffer, 0, pktlen);
+			int numWords = pktlen / 2;
+			if ((numWords) > (end - start + 1))
+				numWords = end - start + 1;
+			for (int index = 0; index < numWords; ++index) {
+				data[offset + index] = (short) ((buffer[index * 2] & 0xFF) | ((buffer[index * 2 + 1] & 0xFF) << 8));
+			}
+			offset += numWords;
+			start += numWords;
+		}
+		if (start <= end) {
+			throw new ProgrammerException("Could not fill entire buffer");
+		}
+	}
+
 	private void read(byte[] data, int offset, int length) throws IOException {
 		while (length > 0) {
 			int ch = readProgrammerByte();
@@ -326,11 +354,48 @@ public abstract class ProgrammerPort {
 		writePacket(new byte[] { 0x00 }, 1);
 	}
 
+	public void writeData(int start, int end, short[] data, int offset, boolean force) throws IOException {
+		ByteArrayOutputStream buffer = new ByteArrayOutputStream(BINARY_WORD_TRANSFER_MAX * 2 + 1);
+		int wordlen = (end - start + 1);
+
+		if (wordlen == 5) {
+			// Cannot use "WRITEBIN" for exactly 10 bytes, so use "WRITE"
+			// instead.
+
+			commandWrite(start, force, Arrays.copyOfRange(data, 0, 5));
+		}
+
+		commandWriteBin(start, force);
+		while (wordlen >= BINARY_WORD_TRANSFER_MAX) {
+			bufferWords(data, offset, BINARY_WORD_TRANSFER_MAX, buffer);
+			writePacketAndClear(buffer);
+			offset += BINARY_WORD_TRANSFER_MAX;
+			wordlen -= BINARY_WORD_TRANSFER_MAX;
+		}
+		if (wordlen > 0) {
+			bufferWords(data, offset, wordlen, buffer);
+			writePacketAndClear(buffer);
+		}
+
+		// Terminating packet.
+		writePacket(new byte[] { 0x00 }, 1);
+	}
+
 	private void bufferWords(ArrayList<Short> data, int srcOffset, int wordCount, ByteArrayOutputStream os)
 			throws IOException {
 		int outputLength = (byte) (wordCount << 1);
 		os.write((byte) outputLength);
 		for (short word : data.subList(srcOffset, srcOffset + wordCount)) {
+			os.write((byte) word);
+			os.write((byte) (word >> 8));
+		}
+	}
+
+	private void bufferWords(short[] data, int srcOffset, int wordCount, ByteArrayOutputStream os) throws IOException {
+		int outputLength = (byte) (wordCount << 1);
+		os.write((byte) outputLength);
+		for (int i = 0; i < wordCount; ++i) {
+			short word = data[srcOffset + i];
 			os.write((byte) word);
 			os.write((byte) (word >> 8));
 		}
@@ -564,4 +629,5 @@ public abstract class ProgrammerPort {
 		private static final long serialVersionUID = 1L;
 
 	}
+
 }

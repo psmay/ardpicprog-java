@@ -4,7 +4,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.ArrayList;
-import java.util.Collections;
+import java.util.Arrays;
 import java.util.Map;
 import java.util.logging.Logger;
 
@@ -20,7 +20,62 @@ public class HexFile {
 
 	private static class Block {
 		int address;
-		ArrayList<Short> data = new ArrayList<Short>();
+		short[] data = new short[0];
+
+		private void resizeLeftAligned(int size) {
+			data = Arrays.copyOf(data, size);
+		}
+
+		private void resizeRightAligned(int newSize) {
+			data = rightCopyOf(data, newSize);
+		}
+
+		private static short[] rightCopyOf(short[] src, final int newSize) {
+			short[] dst = new short[newSize];
+
+			final int currentSize = src.length;
+
+			final int dstEndIndex = newSize;
+
+			// If the copy is right-aligned, this is the ideal dst index of the
+			// first src element.
+			int dstIndexOfSrc0 = newSize - currentSize;
+
+			// We can't copy negative indices, so truncate on left if necessary.
+			int dstStartIndex = (dstIndexOfSrc0 < 0) ? 0 : dstIndexOfSrc0;
+
+			// If truncation happened on dst, do it on src also.
+			int srcStartIndex = dstStartIndex - dstIndexOfSrc0;
+
+			// Now we have the number of elements that will actually be copied.
+			int copyLength = dstEndIndex - dstStartIndex;
+
+			if (copyLength > 0) {
+				System.arraycopy(src, srcStartIndex, dst, dstStartIndex, copyLength);
+			}
+
+			// We would do zero-fill for any remaining elements on the left, but
+			// Java did that for us when the array was created.
+
+			return dst;
+		}
+
+		public void add(short word) {
+			resizeLeftAligned(data.length + 1);
+			data[data.length - 1] = word;
+		}
+
+		public void prepend(short word) {
+			resizeRightAligned(data.length + 1);
+			data[0] = word;
+		}
+
+		public void ensureAtLeast(int newSize) {
+			if (newSize > data.length) {
+				resizeLeftAligned(newSize);
+			}
+		}
+
 	};
 
 	private static class IntPair {
@@ -117,8 +172,8 @@ public class HexFile {
 		// ArrayList<HexFileBlock>::_iterator it;
 		for (Block it : blocks) {
 			// for (it = blocks.begin(); it != blocks.end(); ++it) {
-			if (address >= it.address && address < (it.address + it.data.size())) {
-				return it.data.get(address - it.address);
+			if (address >= it.address && address < (it.address + it.data.length)) {
+				return it.data[address - it.address];
 			}
 		}
 		return fullWord(address);
@@ -136,37 +191,37 @@ public class HexFile {
 				if (address == (block.address - 1)) {
 					// Prepend to the existing block.
 					block.address--;
-					block.data.add(0, word);
+					block.prepend(word);
 				} else {
 					// Create a new block before this one.
 					Block newBlock = new Block();
 					newBlock.address = address;
-					newBlock.data.add(word);
+					newBlock.add(word);
 					blocks.add(index, newBlock);
 				}
 				return;
-			} else if (address < (it.address + it.data.size())) {
+			} else if (address < (it.address + it.data.length)) {
 				// Update a word in an existing block.
-				block.data.set(address - block.address, word);
+				block.data[address - block.address] = word;
 				return;
-			} else if (address == (it.address + it.data.size())) {
+			} else if (address == (it.address + it.data.length)) {
 				// Can we extend the current block without hitting the next
 				// block?
 				if (index < (blocks.size() - 1)) {
 					Block next = blocks.get(index + 1);
 					if (address < next.address) {
-						block.data.add(word);
+						block.add(word);
 						return;
 					}
 				} else {
-					block.data.add(word);
+					block.add(word);
 					return;
 				}
 			}
 		}
 		Block block = new Block();
 		block.address = address;
-		block.data.add(word);
+		block.add(word);
 		blocks.add(block);
 	}
 
@@ -238,7 +293,7 @@ public class HexFile {
 	private void readBlock(ProgrammerPort port, int start, int end) throws IOException {
 		Block block = new Block();
 		block.address = start;
-		ensureAtLeast(block.data, (end - start + 1));
+		block.ensureAtLeast(end - start + 1);
 		port.readData(start, end, block.data, 0);
 		// ArrayList<HexFileBlock>::iterator it;
 		// for (it = blocks.begin(); it != blocks.end(); ++it) {
@@ -256,7 +311,7 @@ public class HexFile {
 	private boolean blankCheckBlock(ProgrammerPort port, int start, int end) throws IOException {
 		Block block = new Block();
 		block.address = start;
-		ensureAtLeast(block.data, (end - start + 1));
+		block.ensureAtLeast(end - start + 1);
 		port.readData(start, end, block.data, 0);
 
 		int i = start;
@@ -268,13 +323,6 @@ public class HexFile {
 		}
 
 		return true;
-	}
-
-	private void ensureAtLeast(ArrayList<Short> data, int newSize) {
-		int size = data.size();
-		if (newSize > size) {
-			data.addAll(Collections.nCopies(newSize - size, (short) 0));
-		}
 	}
 
 	private void flush() {
@@ -591,7 +639,7 @@ public class HexFile {
 
 		for (Block it : blocks) {
 			int start = it.address;
-			int end = start + it.data.size() - 1;
+			int end = start + it.data.length - 1;
 			saveRange(file, start, end, skipOnes);
 		}
 		writeString(file, ":00000001FF\n");
@@ -647,9 +695,8 @@ public class HexFile {
 	private void writeBlock(ProgrammerPort port, int start, int end, boolean forceCalibration) throws IOException {
 		for (Block it : blocks) {
 			int blockStart = it.address;
-			int blockEnd = blockStart + it.data.size() - 1;
+			int blockEnd = blockStart + it.data.length - 1;
 			if (start <= blockEnd && end >= blockStart) {
-				ArrayList<Short> data = it.data;
 				int offset = 0;
 
 				int overlapStart;
@@ -664,7 +711,7 @@ public class HexFile {
 					overlapEnd = end;
 				else
 					overlapEnd = blockEnd;
-				port.writeData(overlapStart, overlapEnd, data, offset, forceCalibration);
+				port.writeData(overlapStart, overlapEnd, it.data, offset, forceCalibration);
 				count += overlapEnd - overlapStart + 1;
 			}
 		}
