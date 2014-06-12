@@ -16,7 +16,7 @@ abstract class Common {
 	private Common() {
 	}
 
-	public static final Charset UTF8;
+	static final Charset UTF8;
 
 	static {
 		try {
@@ -26,18 +26,11 @@ abstract class Common {
 		}
 	}
 
-	public static String join(String sep, Collection<?> values) {
-		StringBuilder sb = new StringBuilder();
-		String prefix = "";
-		for(Object o : values) {
-			sb.append(prefix);
-			sb.append(String.valueOf(o));
-			prefix = sep;
-		}
-		return sb.toString();
+	static byte[] getBytes(String data) {
+		return data.getBytes(UTF8);
 	}
-	
-	public static String join(String sep, Object... values) {
+
+	private static String join(String sep, Object... values) {
 		final int length = values.length;
 		switch (length) {
 		case 0:
@@ -62,44 +55,39 @@ abstract class Common {
 		}
 	}
 
-	public static String toStrictX2(int value) {
+	static Integer parseHex(String str) {
+		// The rules from the original are these:
+		// - The string must contain at least one hex digit.
+		// - The string must not contain '\t' or ' '.
+		// - Any other characters may appear and are ignored.
+		if (str.contains(" ") || str.contains("\t"))
+			return null;
+
+		String digits = str.replaceAll("[^0-9A-Fa-f]+", "");
+
+		if (digits.equals(""))
+			return null;
+
+		return Integer.parseInt(digits, 16);
+	}
+
+	static String toX2(int value) {
 		return Integer.toString(0x100 | (value & 0xFF), 16).substring(1).toUpperCase();
 	}
 
-	private static final byte[] hexAscii = new byte[] { (byte) '0', (byte) '1', (byte) '2', (byte) '3', (byte) '4',
-			(byte) '5', (byte) '6', (byte) '7', (byte) '8', (byte) '9', (byte) 'A', (byte) 'B', (byte) 'C', (byte) 'D',
-			(byte) 'E', (byte) 'F' };
-
-	static byte[] toStrictX2Bytes(byte[] src, int srcStart, int srcLength) {
-		byte[] output = new byte[srcLength * 2];
-		toStrictX2Into(src, srcStart, srcLength, output, 0);
-		return output;
-	}
-
-	static void toStrictX2Into(byte[] src, int srcStart, int srcLength, byte[] dst, int dstStart) {
-		for (int i = 0; i < srcLength; ++i) {
-			int dstIndex = dstStart + (2 * i);
-			dst[dstIndex] = hexAscii[(src[i] & 0xF0) >> 4];
-			dst[dstIndex + 1] = hexAscii[(src[i] & 0x0F)];
+	static String toX2(byte[] values, int offset, int length) {
+		StringBuilder sb = new StringBuilder(length * 2);
+		int end = offset + length;
+		for (int i = offset; i < end; ++i) {
+			sb.append(toX2(values[i]));
 		}
+		return sb.toString();
 	}
 
 	private static String toX4Once(int value) {
-		if (value == (value & 0xFFFF)) {
-			return Integer.toString(0x10000 | value, 16).substring(1).toUpperCase();
-		} else {
-			return Integer.toString(value, 16).toUpperCase();
-		}
+		return Integer.toString(0x10000 | (value & 0xFFFF), 16).substring(1).toUpperCase();
 	}
 
-	private static String[] toX4Array(int... values) {
-		String[] results = new String[values.length];
-		for (int i = 0; i < values.length; ++i) {
-			results[i] = toX4Once(values[i]);
-		}
-		return results;
-	}
-	
 	private static String[] toX4Array(short... values) {
 		String[] results = new String[values.length];
 		for (int i = 0; i < values.length; ++i) {
@@ -107,69 +95,70 @@ abstract class Common {
 		}
 		return results;
 	}
-	
-	public static short[] toShortArray(Collection<Short> numbers) {
+
+	static short[] toShortArray(Collection<Short> numbers) {
 		short[] buffer = new short[numbers.size()];
 		int i = 0;
-		for(short n : numbers) {
-			if(i >= buffer.length) {
+		for (short n : numbers) {
+			if (i >= buffer.length) {
 				int newSize = numbers.size();
-				if(newSize <= i)
+				if (newSize <= i)
 					newSize = i + 1;
 				buffer = Arrays.copyOf(buffer, newSize);
 			}
 			buffer[i] = n;
 		}
-		if(buffer.length != i)
-			buffer = Arrays.copyOf(buffer, i);
-		return buffer;
-	}	
-	
-	public static int[] toIntArray(Collection<Integer> numbers) {
-		int[] buffer = new int[numbers.size()];
-		int i = 0;
-		for(int n : numbers) {
-			if(i >= buffer.length) {
-				int newSize = numbers.size();
-				if(newSize <= i)
-					newSize = i + 1;
-				buffer = Arrays.copyOf(buffer, newSize);
-			}
-			buffer[i] = n;
-		}
-		if(buffer.length != i)
+		if (buffer.length != i)
 			buffer = Arrays.copyOf(buffer, i);
 		return buffer;
 	}
-	
-	public static String toX4(String sep, int... values) {
+
+	static String toX4(String sep, short... values) {
 		return join(sep, (Object[]) toX4Array(values));
 	}
-	
-	public static String toX4(String sep, short... values) {
-		return join(sep, (Object[]) toX4Array(values));
-	}
-	
-	public static String toX4(String sep, Collection<Short> values) {
-		return toX4(sep, toShortArray(values));
-	}
 
-	public static String toX4(int... values) {
-		return toX4(" ", values);
-	}
-	
-	public static String toX4(short... values) {
-		return toX4(" ", values);
-	}
-
-	public static String toX4(Collection<Short> values) {
-		return toX4(" ", values);
-	}
-	
-	static void linesToOut(String... lines) {
+	private static void linesToOut(String... lines) {
 		for (String line : lines) {
 			System.out.println(line);
 		}
+	}
+
+	static void copying() {
+		linesToOut(copyingMessage);
+	}
+
+	static void warranty() {
+		linesToOut(warrantyMessage);
+	}
+
+	static int parseInt(String string) {
+		return Integer.parseInt(string, 10);
+	}
+
+	static int parseInt(String string, int defaultValue) {
+		try {
+			return Integer.parseInt(string, 10);
+		} catch (NumberFormatException e) {
+			return defaultValue;
+		}
+	}
+
+	static InputStream openForRead(String input) throws FileNotFoundException {
+		return new BufferedInputStream(new FileInputStream(input));
+	}
+
+	static OutputStream openForWrite(String filename) throws FileNotFoundException {
+		return new BufferedOutputStream(new FileOutputStream(filename));
+	}
+
+	static void notice(String... string) {
+		for (String line : string) {
+			System.err.println(line);
+		}
+	}
+
+	static boolean stringEmpty(String s) {
+		return (s == null) || (s.isEmpty());
 	}
 
 	private static final String[] copyingMessage = { "                    GNU GENERAL PUBLIC LICENSE",
@@ -646,46 +635,5 @@ abstract class Common {
 			"an absolute waiver of all civil liability in connection with the",
 			"Program, unless a warranty or assumption of liability accompanies a",
 			"copy of the Program in return for a fee." };
-
-	static void copying() {
-		linesToOut(copyingMessage);
-	}
-
-	static void warranty() {
-		linesToOut(warrantyMessage);
-	}
-
-	static int parseInt(String string) {
-		return Integer.parseInt(string, 10);
-	}
-
-	static int parseInt(String string, int defaultValue) {
-		try {
-			return Integer.parseInt(string, 10);
-		} catch (NumberFormatException e) {
-			return defaultValue;
-		}
-	}
-
-	static InputStream openForRead(String input) throws FileNotFoundException {
-		return new BufferedInputStream(new FileInputStream(input));
-	}
-
-	static OutputStream openForWrite(String filename) throws FileNotFoundException {
-		return new BufferedOutputStream(new FileOutputStream(filename));
-
-	}
-
-	static void notice(String... string) {
-		for (String line : string) {
-			System.err.println(line);
-		}
-	}
-
-	static boolean stringEmpty(String s) {
-		return (s == null) || (s.isEmpty());
-	}
-
-
 
 }

@@ -33,8 +33,8 @@ public class RxTxProgrammerPort extends ProgrammerPort {
 	}
 
 	@Override
-	protected void write(byte[] data, int len) throws IOException {
-		out.write(data, 0, len);
+	protected void write(byte[] data, int offset, int length) throws IOException {
+		out.write(data, offset, length);
 	}
 
 	@Override

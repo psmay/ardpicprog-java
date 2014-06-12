@@ -26,7 +26,7 @@ public class Actions {
 			if (hexFile.canForceCalibration()) {
 				log.info("Erasing and removing code protection.");
 				try {
-					port.command("ERASE NOPRESERVE");
+					port.commandErase(true);
 				} catch (IOException e) {
 					throw new EraseException("Erase nopreserve command failed", e);
 				}
@@ -36,7 +36,7 @@ public class Actions {
 		} else {
 			log.info("Erasing and removing code protection.");
 			try {
-				port.command("ERASE");
+				port.commandErase(false);
 			} catch (IOException e) {
 				throw new EraseException("Erase command failed", e);
 			}
@@ -57,10 +57,10 @@ public class Actions {
 		hexFile.read(port);
 		hexFile.save(options.output, options.skipOnes);
 	}
-	
+
 	public static void doBlankCheck(App.Options options, ProgrammerPort port, HexFile hexFile) throws IOException {
 		log.info("Checking whether device is blank");
-		if(hexFile.blankCheckRead(port)) {
+		if (hexFile.blankCheckRead(port)) {
 			log.info("Device appears to be blank");
 		} else {
 			log.info("Device appears to be NOT blank");

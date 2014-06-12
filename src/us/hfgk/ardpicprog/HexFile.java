@@ -9,6 +9,8 @@ import java.util.Map;
 import java.util.logging.Logger;
 
 public class HexFile {
+	private static final int READ_RECORD_OK = 0x7FFFFFFF;
+
 	private static final Logger log = Logger.getLogger(HexFile.class.getName());
 
 	public static final int FORMAT_AUTO = -1;
@@ -32,11 +34,11 @@ public class HexFile {
 			this.end = end;
 		}
 
-		public static IntPair get(int start, int end) {
+		private static IntPair get(int start, int end) {
 			return new IntPair(start, end);
 		}
 
-		public static IntPair empty(int start) {
+		private static IntPair empty(int start) {
 			return get(start, start - 1);
 		}
 	}
@@ -45,83 +47,15 @@ public class HexFile {
 		return _deviceName;
 	}
 
-	public void setDeviceName(String name) {
-		_deviceName = name;
-	}
-
-	public int format() {
-		return _format;
-	}
-
 	public void setFormat(int format) {
 		_format = format;
 	}
 
-	public void setProgramRange(int start, int end) {
-		_programRange = IntPair.get(start, end);
-	}
-
-	public int programStart() {
-		return _programRange.start;
-	}
-
-	public int programEnd() {
-		return _programRange.end;
-	}
-
-	public int configStart() {
-		return _configRange.start;
-	}
-
-	public int configEnd() {
-		return _configRange.end;
-	}
-
-	public void setConfigRange(int start, int end) {
-		_configRange = IntPair.get(start, end);
-	}
-
-	public void setDataRange(int start, int end) {
-		_dataRange = IntPair.get(start, end);
-	}
-
-	public int dataStart() {
-		return _dataRange.start;
-	}
-
-	public int dataEnd() {
-		return _dataRange.end;
-	}
-
-	public void setReservedRange(int start, int end) {
-		_reservedRange = IntPair.get(start, end);
-	}
-
-	public int reservedStart() {
-		return _reservedRange.start;
-	}
-
-	public int reservedEnd() {
-		return _reservedRange.end;
-	}
-
-	public int programBits() {
-		return _programBits;
-	}
-
-	public void setProgramBits(int bits) {
-		_programBits = bits;
-	}
-
-	public int dataBits() {
+	private int dataBits() {
 		return _dataBits;
 	}
 
-	public void setDataBits(int bits) {
-		_dataBits = bits;
-	}
-
-	public int programSizeWords() {
+	int programSizeWords() {
 		return _programRange.end - _programRange.start + 1;
 	}
 
@@ -140,35 +74,9 @@ public class HexFile {
 	private ArrayList<Block> blocks = new ArrayList<Block>();
 	private int count = 0;
 
-	private static String fetchMap(Map<String, String> details, String key) {
-		return fetchMap(details, key, "");
-	}
-
 	private static String fetchMap(Map<String, String> details, String key, String defValue) {
-		String it = details.get(key);
-		return (it == null) ? defValue : it;
-	}
-
-	private static Integer parseHex(String str) {
-		boolean haveHex = false;
-		int value = 0;
-
-		for (int index = 0; index < str.length(); ++index) {
-			char ch = str.charAt(index);
-			if (ch >= '0' && ch <= '9') {
-				value = (value << 4) | (ch - '0');
-				haveHex = true;
-			} else if (ch >= 'A' && ch <= 'F') {
-				value = (value << 4) | (ch - 'A' + 10);
-				haveHex = true;
-			} else if (ch >= 'a' && ch <= 'f') {
-				value = (value << 4) | (ch - 'a' + 10);
-				haveHex = true;
-			} else if (ch != ' ' && ch != '\t') {
-				return null;
-			}
-		}
-		return haveHex ? value : null;
+		String value = details.get(key);
+		return (value == null) ? defValue : value;
 	}
 
 	static IntPair parseRange(String value) throws HexFileException {
@@ -176,53 +84,24 @@ public class HexFile {
 		if (index == -1)
 			throw new HexFileException("Invalid range '" + value + "' (missing '-')");
 		Integer start, end;
-		start = parseHex(value.substring(0, index));
+		start = Common.parseHex(value.substring(0, index));
 		if (start == null)
 			throw new HexFileException("Invalid range '" + value + "' (start not a number)");
-		end = parseHex(value.substring(index + 1));
+		end = Common.parseHex(value.substring(index + 1));
 		if (end == null)
 			throw new HexFileException("Invalid range '" + value + "' (end not a number)");
 		return IntPair.get(start, end);
 	}
 
 	public void setDeviceDetails(Map<String, String> details) throws HexFileException {
-		String value;
-
-		_deviceName = fetchMap(details, "DeviceName");
-
-		value = fetchMap(details, "ProgramRange");
-		if (!value.isEmpty()) {
-			_programRange = parseRange(value);
-		} else {
-			// Disable the program range - device doesn't have program memory.
-			_programRange = IntPair.empty(0x0001);
-		}
+		String value = details.get("DeviceName");
+		_deviceName = (value != null) ? value : "";
+		_programRange = parseRangeUnlessEmpty(details.get("ProgramRange"), 0x0001);
 		_programBits = Common.parseInt(fetchMap(details, "ProgramBits", "14"), 0);
-
-		value = fetchMap(details, "ConfigRange");
-		if (!value.isEmpty()) {
-			_configRange = parseRange(value);
-		} else {
-			// Disable the config range - device doesn't have config memory.
-			_configRange = IntPair.empty(0x2000);
-		}
-
-		value = fetchMap(details, "DataRange");
-		if (!value.isEmpty()) {
-			_dataRange = parseRange(value);
-		} else {
-			// Disable the data range - device doesn't have data memory.
-			_dataRange = IntPair.empty(0x2100);
-		}
+		_configRange = parseRangeUnlessEmpty(details.get("ConfigRange"), 0x2000);
+		_dataRange = parseRangeUnlessEmpty(details.get("DataRange"), 0x2100);
 		_dataBits = Common.parseInt(fetchMap(details, "DataBits", "8"), 0);
-
-		value = fetchMap(details, "ReservedRange");
-		if (!value.isEmpty()) {
-			_reservedRange = parseRange(value);
-		} else {
-			// Disable the reserved range - device doesn't have reserved words.
-			_reservedRange = IntPair.empty(_programRange.end + 1);
-		}
+		_reservedRange = parseRangeUnlessEmpty(details.get("ReservedRange"), _programRange.end + 1);
 
 		if (_programBits < 1)
 			throw new HexFileException("Invalid program word width " + _programBits);
@@ -230,7 +109,11 @@ public class HexFile {
 			throw new HexFileException("Invalid data word width " + _programBits);
 	}
 
-	public short word(int address) {
+	private IntPair parseRangeUnlessEmpty(String value, int emptyStartAddress) throws HexFileException {
+		return Common.stringEmpty(value) ? IntPair.empty(emptyStartAddress) : parseRange(value);
+	}
+
+	private short word(int address) {
 		// ArrayList<HexFileBlock>::_iterator it;
 		for (Block it : blocks) {
 			// for (it = blocks.begin(); it != blocks.end(); ++it) {
@@ -241,7 +124,7 @@ public class HexFile {
 		return fullWord(address);
 	}
 
-	public void setWord(int address, short word) {
+	private void setWord(int address, short word) {
 		int nextIndex = 0;
 
 		for (Block it : blocks) {
@@ -297,8 +180,8 @@ public class HexFile {
 	private boolean wouldBeAllOnes(int address, short wordValue) {
 		return wordValue == fullWord(address);
 	}
-	
-	public boolean isAllOnes(int address) {
+
+	private boolean isAllOnes(int address) {
 		return wouldBeAllOnes(address, word(address));
 	}
 
@@ -320,15 +203,14 @@ public class HexFile {
 			log.info("Skipped reading " + areaDesc + ",");
 		}
 	}
-	
+
 	private boolean blankCheckPart(ProgrammerPort port, String areaDesc, IntPair range) throws IOException {
 		if (range.start <= range.end) {
 			log.info("Blank checking " + areaDesc + ",");
-			if(blankCheckBlock(port, range.start, range.end)) {
+			if (blankCheckBlock(port, range.start, range.end)) {
 				log.info("Looks blank");
 				return true;
-			}
-			else {
+			} else {
 				log.info("Looks non-blank");
 				return false;
 			}
@@ -337,11 +219,10 @@ public class HexFile {
 			return true;
 		}
 	}
-	
+
 	public boolean blankCheckRead(ProgrammerPort port) throws IOException {
-		return blankCheckPart(port, "program memory", _programRange) &&
-				blankCheckPart(port, "data memory", _dataRange) &&
-				blankCheckPart(port, "id words and fuses", _configRange);		
+		return blankCheckPart(port, "program memory", _programRange) && blankCheckPart(port, "data memory", _dataRange)
+				&& blankCheckPart(port, "id words and fuses", _configRange);
 	}
 
 	public void read(ProgrammerPort port) throws IOException {
@@ -379,13 +260,13 @@ public class HexFile {
 		port.readData(start, end, block.data, 0);
 
 		int i = start;
-		for(short word : block.data){
-			if(!wouldBeAllOnes(i, word)) {
+		for (short word : block.data) {
+			if (!wouldBeAllOnes(i, word)) {
 				return false;
 			}
 			++i;
 		}
-		
+
 		return true;
 	}
 
@@ -446,7 +327,7 @@ public class HexFile {
 					validateChecksum(line);
 
 					baseAddress = readRecord(line, baseAddress);
-					if (baseAddress == 0x7FFFFFFF) {
+					if (baseAddress == READ_RECORD_OK) {
 						return; // ok
 					}
 				}
@@ -538,7 +419,7 @@ public class HexFile {
 			// Stop processing at the End Of File Record.
 			if (line.get(0) != 0x00)
 				throw new HexFileException("Invalid end of file record");
-			baseAddress = 0x7FFFFFFF; // fake OK
+			baseAddress = READ_RECORD_OK; // fake OK
 		} else if (line.get(3) == 0x02) {
 			// Extended Segment Address Record.
 			if (line.get(0) != 0x02)
@@ -594,14 +475,9 @@ public class HexFile {
 			}
 		}
 		saveRange(file, _dataRange.start, _dataRange.end, skipOnes);
-		writeAsBytes(file, ":00000001FF\n");
+		writeString(file, ":00000001FF\n");
 		file.close();
 		return true;
-	}
-
-	private static void writeAsBytes(OutputStream file, String string) throws IOException {
-		byte[] bytes = string.getBytes(Common.UTF8);
-		file.write(bytes);
 	}
 
 	private void saveRange(OutputStream file, int start, int end, boolean skipOnes) throws IOException {
@@ -683,14 +559,14 @@ public class HexFile {
 
 	private static void writeLine(OutputStream file, byte[] buffer, int len) throws IOException {
 		int checksum = calculateChecksum(buffer, len);
-		writeAsBytes(file, ":");
+		writeString(file, ":");
 		putBytesAsHex(file, buffer, len);
 		putByteAsHex(file, checksum);
-		writeAsBytes(file, "\n");
+		writeString(file, "\n");
 	}
 
 	private static void putBytesAsHex(OutputStream file, byte[] buffer, int len) throws IOException {
-		file.write(Common.toStrictX2Bytes(buffer, 0, len));
+		writeString(file, Common.toX2(buffer, 0, len));
 	}
 
 	private static int calculateChecksum(byte[] buffer, int len) {
@@ -703,20 +579,22 @@ public class HexFile {
 	}
 
 	private static void putByteAsHex(OutputStream file, int z) throws IOException {
-		writeAsBytes(file, Common.toStrictX2(z));
+		writeString(file, Common.toX2(z));
+	}
+
+	private static void writeString(OutputStream s, String data) throws IOException {
+		s.write(Common.getBytes(data));
 	}
 
 	public void saveCC(String filename, boolean skipOnes) throws IOException {
-		OutputStream file;
-
-		file = Common.openForWrite(filename);
+		OutputStream file = Common.openForWrite(filename);
 
 		for (Block it : blocks) {
 			int start = it.address;
 			int end = start + it.data.size() - 1;
 			saveRange(file, start, end, skipOnes);
 		}
-		writeAsBytes(file, ":00000001FF\n");
+		writeString(file, ":00000001FF\n");
 		file.close();
 	}
 
@@ -796,23 +674,22 @@ public class HexFile {
 
 		private static final long serialVersionUID = 1L;
 
-		public HexFileException() {
+		private HexFileException() {
 			super();
 		}
 
-		public HexFileException(String message, Throwable cause) {
+		private HexFileException(String message, Throwable cause) {
 			super(message, cause);
 		}
 
-		public HexFileException(String message) {
+		private HexFileException(String message) {
 			super(message);
 		}
 
-		public HexFileException(Throwable cause) {
+		private HexFileException(Throwable cause) {
 			super(cause);
 		}
 
 	}
-
 
 }

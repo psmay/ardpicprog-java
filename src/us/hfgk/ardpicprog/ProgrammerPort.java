@@ -1,7 +1,10 @@
 package us.hfgk.ardpicprog;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -10,7 +13,7 @@ import java.util.logging.Logger;
 public abstract class ProgrammerPort {
 	private static final Logger log = Logger.getLogger(ProgrammerPort.class.getName());
 
-	protected static final int BINARY_TRANSFER_MAX = 64;
+	protected static final int BINARY_WORD_TRANSFER_MAX = 32;
 	protected static final int DEFAULT_TIMEOUT_SECONDS = 3;
 
 	protected int buflen;
@@ -64,7 +67,7 @@ public abstract class ProgrammerPort {
 		// Try the "DEVICE" command first to auto-detect the type of
 		// device that is in the programming socket.
 		try {
-			command("DEVICE");
+			commandDevice();
 		} catch (IOException e) {
 			throw new DeviceException(
 					"No device in programmer or programming voltage not available: " + e.getMessage(), e);
@@ -77,25 +80,26 @@ public abstract class ProgrammerPort {
 		// is an EEPROM that needs a manual override to change the default.
 		Map<String, String> details = readDeviceInfo();
 		// Map<String,String>::const_iterator it = details.find("DeviceName");
-		String it = details.get("DeviceName");
+		String detailsDeviceName = details.get("DeviceName");
+		String detailsDeviceID = details.get("DeviceID");
 
-		if (it != null) {
-			if (Common.stringEmpty(deviceName) || deviceName.equals("auto"))
-				return details; // Use auto-detected device in the socket.
-			if (deviceNameMatch(deviceName, it))
+		if (detailsDeviceName != null) {
+
+			if (Common.stringEmpty(deviceName) || deviceName.equals("auto")
+					|| deviceNameMatch(deviceName, detailsDeviceName))
 				return details;
 
-			it = details.get("DeviceID");
-			if (it == null || !it.equals("0000")) {
-				throw new DeviceException("Expecting " + deviceName + " but found " + it + " in the programmer");
+			if (detailsDeviceID == null || !detailsDeviceID.equals("0000")) {
+				throw new DeviceException("Expecting " + deviceName + " but found "
+						+ ((detailsDeviceID == null) ? "an unrecognized device" : detailsDeviceID)
+						+ " in the programmer");
 			}
 		}
 
 		// If the DeviceID is not "0000", then the device in the socket reports
 		// a device identifier, but it is not supported by the programmer.
-		it = details.get("DeviceID");
-		if (it != null && !it.equals("0000")) {
-			throw new DeviceException("Unsupported device in programmer, ID = " + it);
+		if (detailsDeviceID != null && !detailsDeviceID.equals("0000")) {
+			throw new DeviceException("Unsupported device in programmer, ID = " + detailsDeviceID);
 		}
 
 		// If the user wanted to auto-detect the device type, then fail now
@@ -105,18 +109,14 @@ public abstract class ProgrammerPort {
 		}
 
 		// Try using "SETDEVICE" to manually select the device.
-		String cmd = "SETDEVICE " + deviceName;
 		try {
-			command(cmd);
-			return readDeviceInfo();
+			return commandSetDevice(deviceName);
 		} catch (IOException e) {
 			// The device is not supported. Print a list of all supported
 			// devices.
 			String msg = "Device " + deviceName + " is not supported by the programmer.";
 			try {
-				command("DEVICES");
-				String devices = readMultiLineResponse();
-				msg += "Supported devices:\n" + devices + "* = autodetected";
+				msg += "Supported devices:\n" + devices() + "* = autodetected";
 			} catch (IOException ee) {
 				msg += "Failed to list supported devices.";
 			}
@@ -125,18 +125,13 @@ public abstract class ProgrammerPort {
 		}
 	}
 
-	private static byte[] asBytes(String str) {
-		return str.getBytes(Common.UTF8);
-	}
-
 	// Sends a command to the sketch. Returns true if the response is "OK".
 	// Throws if the response is "ERROR" or a timeout occurred.
 	public void command(String cmd) throws IOException {
 		String line = cmd + "\n";
-		byte[] lineBytes = asBytes(line);
 
 		log.fine("Command " + cmd + ": issuing");
-		write(lineBytes, lineBytes.length);
+		write(line);
 
 		String response;
 
@@ -155,7 +150,7 @@ public abstract class ProgrammerPort {
 
 	// Returns a list of the available devices.
 	public String devices() throws IOException {
-		command("DEVICES");
+		commandDevices();
 		return readMultiLineResponse();
 	}
 
@@ -167,9 +162,7 @@ public abstract class ProgrammerPort {
 	public void readData(int start, int end, List<Short> data, int offset) throws IOException {
 		byte[] buffer = new byte[256];
 
-		String strbuffer = "READBIN " + Common.toX4(start) + "-" + Common.toX4(end);
-
-		command(strbuffer);
+		commandReadBin((short) start, (short) end);
 
 		while (start <= end) {
 			int pktlen = readProgrammerByte();
@@ -177,7 +170,7 @@ public abstract class ProgrammerPort {
 				throw new EOFException();
 			else if (pktlen == 0)
 				break;
-			read(buffer, pktlen);
+			read(buffer, 0, pktlen);
 			int numWords = pktlen / 2;
 			if ((numWords) > (end - start + 1))
 				numWords = end - start + 1;
@@ -192,18 +185,14 @@ public abstract class ProgrammerPort {
 		}
 	}
 
-	private void read(byte[] data, int len, int offset) throws IOException {
-		while (len > 0) {
+	private void read(byte[] data, int offset, int length) throws IOException {
+		while (length > 0) {
 			int ch = readProgrammerByte();
 			if (ch == -1)
 				throw new EOFException();
 			data[offset++] = (byte) (0xFF & ch);
-			--len;
+			--length;
 		}
-	}
-
-	private void read(byte[] data, int len) throws IOException {
-		read(data, len, 0);
 	}
 
 	private int readProgrammerByte() throws IOException {
@@ -286,14 +275,14 @@ public abstract class ProgrammerPort {
 	protected void init() {
 	}
 
-	protected abstract void write(byte[] packet, int len) throws IOException;
+	protected abstract void write(byte[] packet, int offset, int length) throws IOException;
 
 	protected void write(byte[] data) throws IOException {
-		write(data, data.length);
+		write(data, 0, data.length);
 	}
 
 	protected void write(String data) throws IOException {
-		write(asBytes(data));
+		write(Common.getBytes(data));
 	}
 
 	protected abstract boolean fillBuffer() throws IOException;
@@ -302,7 +291,7 @@ public abstract class ProgrammerPort {
 
 	public void close() throws IOException {
 		if (deviceStillOpen()) {
-			command("PWROFF");
+			commandPwroff();
 			closeDevice();
 		}
 	}
@@ -312,47 +301,113 @@ public abstract class ProgrammerPort {
 	protected abstract void closeDevice() throws IOException;
 
 	public void writeData(int start, int end, ArrayList<Short> data, int offset, boolean force) throws IOException {
-		byte[] buffer = new byte[BINARY_TRANSFER_MAX + 1];
-		int len = (end - start + 1) * 2;
+		ByteArrayOutputStream buffer = new ByteArrayOutputStream(BINARY_WORD_TRANSFER_MAX * 2 + 1);
+		int wordlen = (end - start + 1);
 
-		if (len == 10) {
+		if (wordlen == 5) {
 			// Cannot use "WRITEBIN" for exactly 10 bytes, so use "WRITE"
 			// instead.
-			command("WRITE " + (force ? "FORCE " : "") + Common.toX4(start) + " " + Common.toX4(data.subList(0, 5)));
+			commandWrite(start, force, data.subList(0, 5));
 		}
 
-		command("WRITEBIN " + (force ? "FORCE " : "") + Common.toX4(start));
-		while (len >= BINARY_TRANSFER_MAX) {
-			bufferWords(data, offset, buffer, BINARY_TRANSFER_MAX);
-			offset += BINARY_TRANSFER_MAX / 2;
-			len -= BINARY_TRANSFER_MAX;
+		commandWriteBin(start, force);
+		while (wordlen >= BINARY_WORD_TRANSFER_MAX) {
+			bufferWords(data, offset, BINARY_WORD_TRANSFER_MAX, buffer);
+			writePacketAndClear(buffer);
+			offset += BINARY_WORD_TRANSFER_MAX;
+			wordlen -= BINARY_WORD_TRANSFER_MAX;
 		}
-		if (len > 0) {
-			bufferWords(data, offset, buffer, len);
+		if (wordlen > 0) {
+			bufferWords(data, offset, wordlen, buffer);
+			writePacketAndClear(buffer);
 		}
-		buffer[0] = (byte) 0x00; // Terminating packet.
-		writePacket(buffer, 1);
+
+		// Terminating packet.
+		writePacket(new byte[] { 0x00 }, 1);
 	}
 
-	private int bufferWords(ArrayList<Short> data, int offset, byte[] buffer, int length) throws IOException {
-		int index;
-		short word;
-		buffer[0] = (byte) length;
-		for (index = 0; index < length; index += 2) {
-			word = data.get(offset + index / 2);
-			buffer[index + 1] = (byte) word;
-			buffer[index + 2] = (byte) (word >> 8);
+	private void bufferWords(ArrayList<Short> data, int srcOffset, int wordCount, ByteArrayOutputStream os)
+			throws IOException {
+		int outputLength = (byte) (wordCount << 1);
+		os.write((byte) outputLength);
+		for (short word : data.subList(srcOffset, srcOffset + wordCount)) {
+			os.write((byte) word);
+			os.write((byte) (word >> 8));
 		}
-		writePacket(buffer, length + 1);
-		return index;
+	}
+
+	private final PacketOutputStream packetOutputStream = new PacketOutputStream(this);
+
+	private void writePacketAndClear(ByteArrayOutputStream os) throws IOException {
+		os.writeTo(packetOutputStream);
+		os.reset();
 	}
 
 	private void writePacket(byte[] packet, int len) throws IOException {
-		log.finest("Writing " + len + " byte(s) as packet");
-		write(packet, len);
-		String response = readProgrammerLine();
-		if (!response.equals("OK"))
-			throw new PacketResponseException("Packet response was '" + response + "'; expected 'OK'");
+		packetOutputStream.write(packet, 0, len);
+	}
+
+	private void commandDevice() throws IOException {
+		command("DEVICE");
+	}
+
+	private void commandDevices() throws IOException {
+		command("DEVICES");
+	}
+
+	public void commandErase(boolean force) throws IOException {
+		if (force) {
+			command("ERASE NOPRESERVE");
+		} else {
+			command("ERASE");
+		}
+	}
+
+	private void commandPwroff() throws IOException {
+		command("PWROFF");
+	}
+
+	private void commandReadBin(int start, int end) throws IOException {
+		command("READBIN " + Common.toX4("-", (short) start, (short) end));
+	}
+
+	private Map<String, String> commandSetDevice(String deviceName) throws IOException {
+		command("SETDEVICE " + deviceName);
+		return readDeviceInfo();
+	}
+
+	private void commandWriteBin(int start, boolean force) throws IOException {
+		command("WRITEBIN " + (force ? "FORCE " : "") + Common.toX4(" ", (short) start));
+	}
+
+	private void commandWrite(int start, boolean force, Collection<Short> values) throws IOException {
+		commandWrite(start, force, Common.toShortArray(values));
+	}
+
+	private void commandWrite(int start, boolean force, short... values) throws IOException {
+		command("WRITE " + (force ? "FORCE " : "") + Common.toX4(" ", (short) start) + " " + Common.toX4(" ", values));
+	}
+
+	private static final class PacketOutputStream extends OutputStream {
+		private final ProgrammerPort port;
+
+		private PacketOutputStream(ProgrammerPort port) {
+			this.port = port;
+		}
+
+		@Override
+		public void write(int b) throws IOException {
+			write(new byte[] { (byte) b });
+		}
+
+		@Override
+		public void write(byte[] b, int off, int len) throws IOException {
+			log.finest("Writing " + len + " byte(s) as packet");
+			port.write(b, off, len);
+			String response = port.readProgrammerLine();
+			if (!response.equals("OK"))
+				throw new PacketResponseException("Packet response was '" + response + "'; expected 'OK'");
+		}
 	}
 
 	public static class ProgrammerException extends IOException {

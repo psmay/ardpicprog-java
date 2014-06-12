@@ -105,7 +105,7 @@ public class App {
 		// Bail out if we don't at least have -i, -o, --erase, or
 		// --list-devices.
 		if (Common.stringEmpty(options.input) && Common.stringEmpty(options.output) && !options.erase
-				&& !options.listDevices && !options.describeDevice &!options.blankCheck) {
+				&& !options.listDevices && !options.describeDevice & !options.blankCheck) {
 			dieUsage("One of -i, -o, --erase, --list-devices, --describe, --blank-check is required");
 		}
 
@@ -322,10 +322,10 @@ public class App {
 				Actions.describeHexFileDevice(hexFile);
 			}
 
-			if(options.blankCheck) {
+			if (options.blankCheck) {
 				Actions.doBlankCheck(options, port, hexFile);
 			}
-			
+
 			// Read the input file.
 			if (!Common.stringEmpty(options.input)) {
 				Actions.doInput(options, hexFile);
