@@ -42,7 +42,7 @@ public class App {
 				device = env;
 
 			env = System.getenv("PIC_PORT");
-			port = Common.stringEmpty(env) ? RxTxProgrammerPort.getDefaultPicPort() : env;
+			port = Common.stringEmpty(env) ? "" : env;
 		}
 
 		public static final char BURN = 'b';

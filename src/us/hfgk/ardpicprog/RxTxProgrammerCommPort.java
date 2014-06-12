@@ -10,42 +10,45 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 
-public class RxTxProgrammerPort extends ProgrammerPort {
+import us.hfgk.ardpicprog.ProgrammerPort.CommBuffer;
+import us.hfgk.ardpicprog.ProgrammerPort.PortSetupException;
+
+public class RxTxProgrammerCommPort implements ProgrammerCommPort {
 	private SerialPort serialPort = null;
 	private int timeoutValue = 5000;
 	private OutputStream out;
 	private InputStream in;
 
+	private static final int DEFAULT_TIMEOUT_MILLISECONDS = 3000;
+
+	private int timeoutMs;
+
 	public static String getDefaultPicPort() {
 		return "/dev/ttyACM0";
 	}
 
-	public RxTxProgrammerPort() {
-		super();
+	public RxTxProgrammerCommPort() {
+		this(DEFAULT_TIMEOUT_MILLISECONDS);
 	}
 
-	public RxTxProgrammerPort(int timeoutSecs) {
-		super(timeoutSecs);
+	public RxTxProgrammerCommPort(int timeoutMs) {
+		this.timeoutMs = timeoutMs;
 	}
 
-	@Override
-	protected void init() {
-	}
-
-	@Override
-	protected void write(byte[] data, int offset, int length) throws IOException {
+	public void write(byte[] data, int offset, int length) throws IOException {
 		out.write(data, offset, length);
 	}
 
-	@Override
-	protected boolean fillBuffer(CommBuffer buff) throws IOException {
+	public boolean fillBuffer(CommBuffer buff) throws IOException {
 		return buff.fillFrom(in) > 0;
 	}
 
-	@Override
 	public void open(String port, int speed) throws IOException {
 		if (serialPort != null)
-			throw new PortSetupException("Programmer port already open");
+			throw new PortSetupException("Programmer comm port already open");
+
+		if (Common.stringEmpty(port))
+			port = getDefaultPicPort();
 
 		boolean ok = false;
 
@@ -60,14 +63,7 @@ public class RxTxProgrammerPort extends ProgrammerPort {
 			out = serialPort.getOutputStream();
 			in = serialPort.getInputStream();
 			serialPort.enableReceiveThreshold(1);
-
-			// Wait for programmer to recover from a reset
 			serialPort.enableReceiveTimeout(1000);
-			boolean versionCompatible = pollVersion(0);
-			if (!versionCompatible)
-				throw new PortSetupException(port + ": Programmer did not respond with a compatible version string");
-
-			serialPort.enableReceiveTimeout(timeoutSecs * 1000);
 			ok = true;
 		} catch (NoSuchPortException e) {
 			throw new PortSetupException(port + ": No such port", e);
@@ -87,19 +83,35 @@ public class RxTxProgrammerPort extends ProgrammerPort {
 		}
 	}
 
-	@Override
-	protected boolean deviceStillOpen() {
+	public void setReceiveTimeout(int milliseconds) throws PortSetupException {
+		if (serialPort != null)
+			try {
+				serialPort.enableReceiveTimeout(milliseconds);
+			} catch (UnsupportedCommOperationException e) {
+				throw new PortSetupException("Changing the timeout is not supported on this port", e);
+			}
+		timeoutMs = milliseconds;
+	}
+
+	public int getReceiveTimeout() {
+		return (serialPort == null) ? timeoutMs : serialPort.getReceiveTimeout();
+	}
+
+	public boolean isStillOpen() {
 		return serialPort != null;
 	}
 
-	@Override
-	protected void closeDevice() throws IOException {
+	public void close() throws IOException {
 		if (serialPort != null) {
 			serialPort.close();
 			serialPort = null;
 			out = null;
 			in = null;
 		}
+	}
+
+	@Override
+	public void init() {
 	}
 
 }

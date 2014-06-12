@@ -12,11 +12,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.logging.Logger;
 
-public abstract class ProgrammerPort {
+public class ProgrammerPort {
 	private static final Logger log = Logger.getLogger(ProgrammerPort.class.getName());
 
-	protected static final int BINARY_WORD_TRANSFER_MAX = 32;
-	protected static final int DEFAULT_TIMEOUT_SECONDS = 3;
+	private static final int BINARY_WORD_TRANSFER_MAX = 32;
 
 	public static class CommBuffer {
 		private int buflen = 0;
@@ -37,31 +36,33 @@ public abstract class ProgrammerPort {
 
 		private int readProgrammerByte(ProgrammerPort src) throws IOException {
 			if (bufposn >= buflen) {
-				if (!src.fillBuffer(this))
+				if (!src.com.fillBuffer(this))
 					return -1;
 			}
 			return buffer[bufposn++] & 0xFF;
 		}
 	}
 
-	protected CommBuffer buff = new CommBuffer();
-	protected int timeoutSecs;
+	private ProgrammerCommPort com = null;
 
-	protected ProgrammerPort(int timeoutSecs) {
-		this.timeoutSecs = timeoutSecs;
-		init();
+	private CommBuffer buff = new CommBuffer();
+
+	ProgrammerPort(ProgrammerCommPort com) throws IOException {
+		this.com = com;
+		com.init();
+		com.setReceiveTimeout(1000);
+		boolean versionCompatible = pollVersion(0);
+		if (!versionCompatible)
+			throw new PortSetupException("Programmer did not respond with a compatible version string");
+		com.setReceiveTimeout(3000);
 	}
 
-	protected ProgrammerPort() {
-		this(DEFAULT_TIMEOUT_SECONDS);
-	}
-
-	protected boolean pollVersion(int retry) throws IOException {
+	private boolean pollVersion(int retry) throws IOException {
 		if (retry <= 0)
 			retry = 5;
 		while (retry > 0) {
 			log.fine("Requesting programmer version");
-			write("PROGRAM_PIC_VERSION\n");
+			writeString("PROGRAM_PIC_VERSION\n");
 			log.finest("Waiting for programmer version");
 			String response = readProgrammerLine();
 			if (!Common.stringEmpty(response)) {
@@ -155,7 +156,7 @@ public abstract class ProgrammerPort {
 		String line = cmd + "\n";
 
 		log.fine("Command " + cmd + ": issuing");
-		write(line);
+		writeString(line);
 
 		String response;
 
@@ -170,6 +171,11 @@ public abstract class ProgrammerPort {
 			throw new CommandException("Response to command '" + cmd + "' not OK: '" + response + "'");
 		}
 		log.fine("Command " + cmd + ": Got OK response");
+	}
+
+	private void writeString(String str) throws IOException {
+		byte[] data1 = Common.getBytes(str);
+		com.write(data1, 0, data1.length);
 	}
 
 	// Returns a list of the available devices.
@@ -319,33 +325,12 @@ public abstract class ProgrammerPort {
 		return response;
 	}
 
-	protected void init() {
-	}
-
-	protected abstract void write(byte[] packet, int offset, int length) throws IOException;
-
-	protected void write(byte[] data) throws IOException {
-		write(data, 0, data.length);
-	}
-
-	protected void write(String data) throws IOException {
-		write(Common.getBytes(data));
-	}
-
-	protected abstract boolean fillBuffer(CommBuffer buff) throws IOException;
-
-	public abstract void open(String port, int speed) throws IOException;
-
 	public void close() throws IOException {
-		if (deviceStillOpen()) {
+		if (com.isStillOpen()) {
 			commandPwroff();
-			closeDevice();
+			com.close();
 		}
 	}
-
-	protected abstract boolean deviceStillOpen();
-
-	protected abstract void closeDevice() throws IOException;
 
 	public void writeData(int start, int end, ArrayList<Short> data, int offset, boolean force) throws IOException {
 		ByteArrayOutputStream buffer = new ByteArrayOutputStream(BINARY_WORD_TRANSFER_MAX * 2 + 1);
@@ -487,7 +472,7 @@ public abstract class ProgrammerPort {
 		@Override
 		public void write(byte[] b, int off, int len) throws IOException {
 			log.finest("Writing " + len + " byte(s) as packet");
-			port.write(b, off, len);
+			port.com.write(b, off, len);
 			String response = port.readProgrammerLine();
 			if (!response.equals("OK"))
 				throw new PacketResponseException("Packet response was '" + response + "'; expected 'OK'");

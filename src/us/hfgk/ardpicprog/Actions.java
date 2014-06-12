@@ -69,9 +69,10 @@ public class Actions {
 
 	static ProgrammerPort getProgrammerPort(String port, int speed) throws IOException {
 		log.info("Initializing programmer ...");
-		ProgrammerPort sp = new RxTxProgrammerPort();
+		ProgrammerCommPort sp = new RxTxProgrammerCommPort();
 		sp.open(port, speed);
-		return sp;
+		ProgrammerPort pp = new ProgrammerPort(sp);
+		return pp;
 	}
 
 	static void describeHexFileDevice(HexFile hexFile) {
