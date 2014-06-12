@@ -38,15 +38,8 @@ public class RxTxProgrammerPort extends ProgrammerPort {
 	}
 
 	@Override
-	protected boolean fillBuffer() throws IOException {
-		int bytesRead;
-		buflen = 0;
-		bufposn = 0;
-
-		bytesRead = in.read(buffer);
-		buflen = bytesRead;
-
-		return (bytesRead > 0);
+	protected boolean fillBuffer(CommBuffer buff) throws IOException {
+		return buff.fillFrom(in) > 0;
 	}
 
 	@Override

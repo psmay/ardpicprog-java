@@ -2,6 +2,7 @@ package us.hfgk.ardpicprog;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -17,14 +18,36 @@ public abstract class ProgrammerPort {
 	protected static final int BINARY_WORD_TRANSFER_MAX = 32;
 	protected static final int DEFAULT_TIMEOUT_SECONDS = 3;
 
-	protected int buflen;
-	protected int bufposn;
+	public static class CommBuffer {
+		private int buflen = 0;
+		private int bufposn = 0;
+		private byte[] buffer = new byte[1024];
+
+		public int fillFrom(InputStream in) throws IOException {
+			int bytesRead;
+
+			buflen = 0;
+			bufposn = 0;
+
+			bytesRead = in.read(buffer);
+			buflen = bytesRead;
+
+			return bytesRead;
+		}
+
+		private int readProgrammerByte(ProgrammerPort src) throws IOException {
+			if (bufposn >= buflen) {
+				if (!src.fillBuffer(this))
+					return -1;
+			}
+			return buffer[bufposn++] & 0xFF;
+		}
+	}
+
+	protected CommBuffer buff = new CommBuffer();
 	protected int timeoutSecs;
-	protected byte[] buffer = new byte[1024];
 
 	protected ProgrammerPort(int timeoutSecs) {
-		this.buflen = 0;
-		this.bufposn = 0;
 		this.timeoutSecs = timeoutSecs;
 		init();
 	}
@@ -224,11 +247,7 @@ public abstract class ProgrammerPort {
 	}
 
 	private int readProgrammerByte() throws IOException {
-		if (bufposn >= buflen) {
-			if (!fillBuffer())
-				return -1;
-		}
-		return buffer[bufposn++] & 0xFF;
+		return buff.readProgrammerByte(this);
 	}
 
 	private String readProgrammerLine() throws IOException {
@@ -313,7 +332,7 @@ public abstract class ProgrammerPort {
 		write(Common.getBytes(data));
 	}
 
-	protected abstract boolean fillBuffer() throws IOException;
+	protected abstract boolean fillBuffer(CommBuffer buff) throws IOException;
 
 	public abstract void open(String port, int speed) throws IOException;
 
