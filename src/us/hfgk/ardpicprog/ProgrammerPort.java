@@ -4,11 +4,8 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.logging.Logger;
 
@@ -22,7 +19,7 @@ public class ProgrammerPort {
 		private int bufposn = 0;
 		private byte[] buffer = new byte[1024];
 
-		public int fillFrom(InputStream in) throws IOException {
+		int fillFrom(InputStream in) throws IOException {
 			int bytesRead;
 
 			buflen = 0;
@@ -88,7 +85,7 @@ public class ProgrammerPort {
 		return name1.equalsIgnoreCase(name2);
 	}
 
-	public Map<String, String> initDevice(String deviceName) throws IOException {
+	Map<String, String> initDevice(String deviceName) throws IOException {
 		// Try the "DEVICE" command first to auto-detect the type of
 		// device that is in the programming socket.
 		try {
@@ -152,7 +149,7 @@ public class ProgrammerPort {
 
 	// Sends a command to the sketch. Returns true if the response is "OK".
 	// Throws if the response is "ERROR" or a timeout occurred.
-	public void command(String cmd) throws IOException {
+	private void command(String cmd) throws IOException {
 		String line = cmd + "\n";
 
 		log.fine("Command " + cmd + ": issuing");
@@ -174,49 +171,18 @@ public class ProgrammerPort {
 	}
 
 	private void writeString(String str) throws IOException {
-		byte[] data1 = Common.getBytes(str);
-		com.write(data1, 0, data1.length);
+		byte[] bytes = Common.getBytes(str);
+		com.write(bytes, 0, bytes.length);
 	}
 
 	// Returns a list of the available devices.
-	public String devices() throws IOException {
+	String devices() throws IOException {
 		commandDevices();
 		return readMultiLineResponse();
 	}
 
-	public void readData(int start, int end, List<Short> data) throws IOException {
-		readData(start, end, data, 0);
-	}
-
 	// Reads a large block of data using "READBIN".
-	public void readData(int start, int end, List<Short> data, int offset) throws IOException {
-		byte[] buffer = new byte[256];
-
-		commandReadBin((short) start, (short) end);
-
-		while (start <= end) {
-			int pktlen = readProgrammerByte();
-			if (pktlen < 0)
-				throw new EOFException();
-			else if (pktlen == 0)
-				break;
-			read(buffer, 0, pktlen);
-			int numWords = pktlen / 2;
-			if ((numWords) > (end - start + 1))
-				numWords = end - start + 1;
-			for (int index = 0; index < numWords; ++index) {
-				data.set(offset + index, (short) ((buffer[index * 2] & 0xFF) | ((buffer[index * 2 + 1] & 0xFF) << 8)));
-			}
-			offset += numWords;
-			start += numWords;
-		}
-		if (start <= end) {
-			throw new ProgrammerException("Could not fill entire buffer");
-		}
-	}
-
-	// Reads a large block of data using "READBIN".
-	public void readData(int start, int end, short[] data, int offset) throws IOException {
+	void readData(int start, int end, short[] data, int offset) throws IOException {
 		byte[] buffer = new byte[256];
 
 		commandReadBin((short) start, (short) end);
@@ -325,40 +291,14 @@ public class ProgrammerPort {
 		return response;
 	}
 
-	public void close() throws IOException {
+	void close() throws IOException {
 		if (com.isStillOpen()) {
 			commandPwroff();
 			com.close();
 		}
 	}
 
-	public void writeData(int start, int end, ArrayList<Short> data, int offset, boolean force) throws IOException {
-		ByteArrayOutputStream buffer = new ByteArrayOutputStream(BINARY_WORD_TRANSFER_MAX * 2 + 1);
-		int wordlen = (end - start + 1);
-
-		if (wordlen == 5) {
-			// Cannot use "WRITEBIN" for exactly 10 bytes, so use "WRITE"
-			// instead.
-			commandWrite(start, force, data.subList(0, 5));
-		}
-
-		commandWriteBin(start, force);
-		while (wordlen >= BINARY_WORD_TRANSFER_MAX) {
-			bufferWords(data, offset, BINARY_WORD_TRANSFER_MAX, buffer);
-			writePacketAndClear(buffer);
-			offset += BINARY_WORD_TRANSFER_MAX;
-			wordlen -= BINARY_WORD_TRANSFER_MAX;
-		}
-		if (wordlen > 0) {
-			bufferWords(data, offset, wordlen, buffer);
-			writePacketAndClear(buffer);
-		}
-
-		// Terminating packet.
-		writePacket(new byte[] { 0x00 }, 1);
-	}
-
-	public void writeData(int start, int end, short[] data, int offset, boolean force) throws IOException {
+	void writeData(int start, int end, short[] data, int offset, boolean force) throws IOException {
 		ByteArrayOutputStream buffer = new ByteArrayOutputStream(BINARY_WORD_TRANSFER_MAX * 2 + 1);
 		int wordlen = (end - start + 1);
 
@@ -383,16 +323,6 @@ public class ProgrammerPort {
 
 		// Terminating packet.
 		writePacket(new byte[] { 0x00 }, 1);
-	}
-
-	private void bufferWords(ArrayList<Short> data, int srcOffset, int wordCount, ByteArrayOutputStream os)
-			throws IOException {
-		int outputLength = (byte) (wordCount << 1);
-		os.write((byte) outputLength);
-		for (short word : data.subList(srcOffset, srcOffset + wordCount)) {
-			os.write((byte) word);
-			os.write((byte) (word >> 8));
-		}
 	}
 
 	private void bufferWords(short[] data, int srcOffset, int wordCount, ByteArrayOutputStream os) throws IOException {
@@ -424,7 +354,7 @@ public class ProgrammerPort {
 		command("DEVICES");
 	}
 
-	public void commandErase(boolean force) throws IOException {
+	void commandErase(boolean force) throws IOException {
 		if (force) {
 			command("ERASE NOPRESERVE");
 		} else {
@@ -447,10 +377,6 @@ public class ProgrammerPort {
 
 	private void commandWriteBin(int start, boolean force) throws IOException {
 		command("WRITEBIN " + (force ? "FORCE " : "") + Common.toX4(" ", (short) start));
-	}
-
-	private void commandWrite(int start, boolean force, Collection<Short> values) throws IOException {
-		commandWrite(start, force, Common.toShortArray(values));
 	}
 
 	private void commandWrite(int start, boolean force, short... values) throws IOException {
@@ -482,90 +408,90 @@ public class ProgrammerPort {
 	public static class ProgrammerException extends IOException {
 		private static final long serialVersionUID = 1L;
 
-		public ProgrammerException() {
+		private ProgrammerException() {
 			super();
 		}
 
-		public ProgrammerException(String message, Throwable cause) {
+		private ProgrammerException(String message, Throwable cause) {
 			super(message, cause);
 		}
 
-		public ProgrammerException(String message) {
+		private ProgrammerException(String message) {
 			super(message);
 		}
 
-		public ProgrammerException(Throwable cause) {
+		private ProgrammerException(Throwable cause) {
 			super(cause);
 		}
 
 	}
 
-	public static class CommandException extends ProgrammerException {
+	private static class CommandException extends ProgrammerException {
 		private static final long serialVersionUID = 1L;
 
-		public CommandException() {
+		private CommandException() {
 			super();
 		}
 
-		public CommandException(String message, Throwable cause) {
+		private CommandException(String message, Throwable cause) {
 			super(message, cause);
 		}
 
-		public CommandException(String message) {
+		private CommandException(String message) {
 			super(message);
 		}
 
-		public CommandException(Throwable cause) {
+		private CommandException(Throwable cause) {
 			super(cause);
 		}
 	}
 
-	public static class EOFException extends ProgrammerException {
+	private static class EOFException extends ProgrammerException {
 
 		private static final long serialVersionUID = 1L;
 
-		public EOFException() {
+		private EOFException() {
 			super();
 
 		}
 
-		public EOFException(String message, Throwable cause) {
+		private EOFException(String message, Throwable cause) {
 			super(message, cause);
 
 		}
 
-		public EOFException(String message) {
+		private EOFException(String message) {
 			super(message);
 
 		}
 
-		public EOFException(Throwable cause) {
+		private EOFException(Throwable cause) {
 			super(cause);
 
 		}
 
 	}
 
-	public static class PacketResponseException extends ProgrammerException {
+	private static class PacketResponseException extends ProgrammerException {
 
 		private static final long serialVersionUID = 1L;
 
-		public PacketResponseException() {
+		private PacketResponseException() {
 			super();
 
 		}
 
-		public PacketResponseException(String message, Throwable cause) {
+		private PacketResponseException(String message, Throwable cause) {
 			super(message, cause);
 
 		}
 
-		public PacketResponseException(String message) {
+		private PacketResponseException(String message) {
 			super(message);
 
 		}
 
-		public PacketResponseException(Throwable cause) {
+		private PacketResponseException(Throwable cause) {
 			super(cause);
 
 		}
@@ -575,19 +501,19 @@ public class ProgrammerPort {
 	public static class DeviceException extends ProgrammerException {
 		private static final long serialVersionUID = 1L;
 
-		public DeviceException() {
+		private DeviceException() {
 			super();
 		}
 
-		public DeviceException(String message, Throwable cause) {
+		private DeviceException(String message, Throwable cause) {
 			super(message, cause);
 		}
 
-		public DeviceException(String message) {
+		private DeviceException(String message) {
 			super(message);
 		}
 
-		public DeviceException(Throwable cause) {
+		private DeviceException(Throwable cause) {
 			super(cause);
 		}
 
@@ -596,37 +522,37 @@ public class ProgrammerPort {
 	public static class EraseException extends CommandException {
 		private static final long serialVersionUID = 1L;
 
-		public EraseException() {
+		EraseException() {
 			super();
 		}
 
-		public EraseException(String message, Throwable cause) {
+		EraseException(String message, Throwable cause) {
 			super(message, cause);
 		}
 
-		public EraseException(String message) {
+		EraseException(String message) {
 			super(message);
 		}
 
-		public EraseException(Throwable cause) {
+		EraseException(Throwable cause) {
 			super(cause);
 		}
 	}
 
 	public static class PortSetupException extends ProgrammerException {
-		public PortSetupException() {
+		PortSetupException() {
 			super();
 		}
 
-		public PortSetupException(String message, Throwable cause) {
+		PortSetupException(String message, Throwable cause) {
 			super(message, cause);
 		}
 
-		public PortSetupException(String message) {
+		PortSetupException(String message) {
 			super(message);
 		}
 
-		public PortSetupException(Throwable cause) {
+		PortSetupException(Throwable cause) {
 			super(cause);
 		}
 
