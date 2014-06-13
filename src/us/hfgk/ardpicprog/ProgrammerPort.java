@@ -182,12 +182,12 @@ public class ProgrammerPort {
 
 	void readData(IntRange range, short[] data, int offset) throws IOException, EOFException,
 			ProgrammerException {
-		int current = range.start;
+		int current = range.start();
 		byte[] buffer = new byte[256];
 
 		commandReadBin(range);
 
-		while (current <= range.end) {
+		while (current <= range.end()) {
 			int pktlen = readProgrammerByte();
 			if (pktlen < 0)
 				throw new EOFException();
@@ -195,15 +195,15 @@ public class ProgrammerPort {
 				break;
 			read(buffer, 0, pktlen);
 			int numWords = pktlen / 2;
-			if ((numWords) > (range.end - current + 1))
-				numWords = range.end - current + 1;
+			if ((numWords) > (range.post() - current))
+				numWords = range.post() - current;
 			for (int index = 0; index < numWords; ++index) {
 				data[offset + index] = (short) ((buffer[index * 2] & 0xFF) | ((buffer[index * 2 + 1] & 0xFF) << 8));
 			}
 			offset += numWords;
 			current += numWords;
 		}
-		if (current <= range.end) {
+		if (current <= range.end()) {
 			throw new ProgrammerException("Could not fill entire buffer");
 		}
 	}
@@ -300,16 +300,16 @@ public class ProgrammerPort {
 
 	void writeData(IntRange range, short[] data, int offset, boolean force) throws IOException {
 		ByteArrayOutputStream buffer = new ByteArrayOutputStream(BINARY_WORD_TRANSFER_MAX * 2 + 1);
-		int wordlen = (range.end - range.start + 1);
+		int wordlen = (range.size());
 
 		if (wordlen == 5) {
 			// Cannot use "WRITEBIN" for exactly 10 bytes, so use "WRITE"
 			// instead.
 
-			commandWrite(range.start, force, Arrays.copyOfRange(data, 0, 5));
+			commandWrite(range.start(), force, Arrays.copyOfRange(data, 0, 5));
 		}
 
-		commandWriteBin(range.start, force);
+		commandWriteBin(range.start(), force);
 		while (wordlen >= BINARY_WORD_TRANSFER_MAX) {
 			bufferWords(data, offset, BINARY_WORD_TRANSFER_MAX, buffer);
 			writePacketAndClear(buffer);
@@ -367,7 +367,7 @@ public class ProgrammerPort {
 	}
 
 	private void commandReadBin(IntRange range) throws IOException {
-		command("READBIN " + Common.toX4("-", (short) range.start, (short) range.end));
+		command("READBIN " + Common.toX4("-", (short) range.start(), (short) range.end()));
 	}
 
 	private Map<String, String> commandSetDevice(String deviceName) throws IOException {

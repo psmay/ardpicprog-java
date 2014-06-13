@@ -128,7 +128,7 @@ class SparseShortList {
 	}
 
 	void readBlock(BlockReader br, IntRange range) throws IOException {
-		Block block = new Block(range.start, range.end - range.start + 1);
+		Block block = new Block(range.start(), range.size());
 		br.doRead(range, block.data, 0);
 		insertBlock(block);
 	}
@@ -136,23 +136,22 @@ class SparseShortList {
 	int writeBlock(BlockWriter bw, IntRange range) throws IOException {
 		int count = 0;
 		for (Block block : blocks) {
-			int blockStart = block.startIndex;
-			int blockEnd = blockStart + block.data.length - 1;
-			if (range.start <= blockEnd && range.end >= blockStart) {
+			IntRange brange = IntRange.get(block.startIndex, block.startIndex + block.data.length - 1);
+			if (range.containsRange(brange)) {
 				int offset = 0;
 
 				int overlapStart;
 				int overlapEnd;
-				if (range.start > blockStart) {
-					offset += (range.start - blockStart);
-					overlapStart = range.start;
+				if (range.start() > brange.start()) {
+					offset += (range.start() - brange.start());
+					overlapStart = range.start();
 				} else {
-					overlapStart = blockStart;
+					overlapStart = brange.start();
 				}
-				if (range.end < blockEnd)
-					overlapEnd = range.end;
+				if (range.end() < brange.end())
+					overlapEnd = range.end();
 				else
-					overlapEnd = blockEnd;
+					overlapEnd = brange.end();
 				IntRange overlap = IntRange.get(overlapStart, overlapEnd);
 				bw.doWrite(overlap, block.data, offset);
 				count += overlapEnd - overlapStart + 1;
