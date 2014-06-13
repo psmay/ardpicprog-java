@@ -142,13 +142,13 @@ class SparseShortList {
 		blocks.add(new Block(address, 0, word));
 	}
 
-	void readBlock(BlockReader br, IntRange range) throws IOException {
+	void readBlock(BlockReader source, IntRange range) throws IOException {
 		Block block = new Block(range);
-		br.doRead(range, block.data, 0);
+		source.doRead(range, block.data, 0);
 		insertBlock(block);
 	}
 
-	int writeBlock(BlockWriter bw, IntRange range) throws IOException {
+	int writeBlock(BlockWriter destination, IntRange range) throws IOException {
 		int count = 0;
 		for (Block block : blocks) {
 			// Finds the intersection of a block's range and the requested
@@ -157,7 +157,7 @@ class SparseShortList {
 			IntRange blockRange = block.currentRange();
 			IntRange overlap = range.overlapWithContainedRange(blockRange);
 			if (overlap != null) {
-				bw.doWrite(overlap, block.data, overlap.start() - blockRange.start());
+				destination.doWrite(overlap, block.data, overlap.start() - blockRange.start());
 				count += overlap.size();
 			}
 		}
@@ -165,10 +165,10 @@ class SparseShortList {
 	}
 
 	interface BlockWriter {
-		public void doWrite(IntRange range, short[] data, int offset) throws IOException;
+		public void doWrite(IntRange range, short[] srcArray, int offset) throws IOException;
 	}
 
 	interface BlockReader {
-		public void doRead(IntRange range, short[] data, int offset) throws IOException;
+		public void doRead(IntRange range, short[] destArray, int offset) throws IOException;
 	}
 }

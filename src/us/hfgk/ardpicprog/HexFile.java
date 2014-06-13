@@ -8,10 +8,20 @@ import java.util.Map;
 import java.util.logging.Logger;
 
 public class HexFile {
-	private static final int READ_RECORD_OK = 0x7FFFFFFF;
-
 	private static final Logger log = Logger.getLogger(HexFile.class.getName());
 
+	// Record types
+	private static final int RECORD_DATA = 0x00;
+	private static final int RECORD_EOF = 0x01;
+	private static final int RECORD_EXTENDED_SEGMENT_ADDRESS = 0x02;
+	private static final int RECORD_START_SEGMENT_ADDRESS = 0x03;
+	private static final int RECORD_EXTENDED_LINEAR_ADDRESS = 0x04;
+	private static final int RECORD_START_LINEAR_ADDRESS = 0x05;
+
+	// Dummy base address to express that reading record was successful
+	private static final int READ_RECORD_OK = 0x7FFFFFFF;
+
+	// Hex file formats
 	public static final int FORMAT_AUTO = -1;
 	public static final int FORMAT_IHX8M = 0;
 	public static final int FORMAT_IHX16 = 1;
@@ -94,10 +104,8 @@ public class HexFile {
 	}
 
 	private short fullWord(int address) {
-		if (_dataRange.containsValue(address))
-			return (short) ((1 << _dataBits) - 1);
-		else
-			return (short) ((1 << _programBits) - 1);
+		int numberOfBits = _dataRange.containsValue(address) ? _dataBits : _programBits;
+		return (short) ((1 << numberOfBits) - 1);
 	}
 
 	private boolean wouldBeAllOnes(int address, short wordValue) {
@@ -111,7 +119,8 @@ public class HexFile {
 	public boolean canForceCalibration() {
 		if (_reservedRange.isEmpty())
 			return true; // No reserved words, so force is trivially ok.
-		for (int address = _reservedRange.start(); address < _reservedRange.post(); ++address) {
+		int post = _reservedRange.post();
+		for (int address = _reservedRange.start(); address < post; ++address) {
 			if (!isAllOnes(address))
 				return true;
 		}
@@ -158,13 +167,13 @@ public class HexFile {
 		log.info("done.");
 	}
 
-	private void readBlock(ProgrammerPort port, IntRange range) throws IOException {
-		words.readBlock(port.getBlockReader(), range);
+	private void readBlock(ProgrammerPort source, IntRange range) throws IOException {
+		words.readBlock(source.getBlockReader(), range);
 	}
 
-	private boolean blankCheckBlock(ProgrammerPort port, IntRange range) throws IOException {
+	private boolean blankCheckBlock(ProgrammerPort source, IntRange range) throws IOException {
 		final short[] buf = new short[range.size()];
-		port.getBlockReader().doRead(range, buf, 0);
+		source.getBlockReader().doRead(range, buf, 0);
 
 		int i = range.start();
 		for (short word : buf) {
@@ -194,13 +203,13 @@ public class HexFile {
 	}
 
 	// Read a big-endian word value from a buffer.
-	private static short readBigWord(ArrayList<Byte> line, int index) {
-		return shortFromBytes(line.get(index), line.get(index + 1));
+	private static short readBigWord(ArrayList<Byte> bytes, int index) {
+		return shortFromBytes(bytes.get(index), bytes.get(index + 1));
 	}
 
 	// Read a little-endian word value from a buffer.
-	private static short readLittleWord(ArrayList<Byte> buf, int index) {
-		return shortFromBytes(buf.get(index + 1), buf.get(index));
+	private static short readLittleWord(ArrayList<Byte> bytes, int index) {
+		return shortFromBytes(bytes.get(index + 1), bytes.get(index));
 	}
 
 	public void load(InputStream file) throws IOException {
@@ -300,41 +309,57 @@ public class HexFile {
 	}
 
 	private int readRecord(ArrayList<Byte> line, int baseAddress) throws HexFileException {
-		if (line.get(3) == 0x00) {
+
+		byte byte3 = line.get(3);
+		byte byte0 = line.get(0);
+
+		switch (byte3) {
+		case RECORD_DATA:
 			// Data record.
-			if ((line.get(0) & 0x01) != 0)
+			if ((byte0 & 0x01) != 0)
 				throw new HexFileException("Line length must be even");
 
 			int address = baseAddress + readBigWord(line, 1);
 			if ((address & 0x0001) != 0)
 				throw new HexFileException("Address must be even");
 
-			address >>= 1; // Convert byte address into word address.\
+			copyLineToWords(line, address >> 1); // pass word address
+			return baseAddress;
 
-			for (int index2 = 0; index2 < (line.size() - 5); index2 += 2) {
-				short word = readLittleWord(line, index2 + 4);
-				words.set(address + index2 / 2, word);
-			}
-		} else if (line.get(3) == 0x01) {
+		case RECORD_EOF:
 			// Stop processing at the End Of File Record.
-			if (line.get(0) != 0x00)
+			if (byte0 != 0x00)
 				throw new HexFileException("Invalid end of file record");
-			baseAddress = READ_RECORD_OK; // fake OK
-		} else if (line.get(3) == 0x02) {
+			return READ_RECORD_OK; // fake OK
+
+		case RECORD_EXTENDED_SEGMENT_ADDRESS:
 			// Extended Segment Address Record.
-			if (line.get(0) != 0x02)
+			if (byte0 != 0x02)
 				throw new HexFileException("Invalid segment address record");
-			baseAddress = (readBigWord(line, 4)) << 4;
-		} else if (line.get(3) == 0x04) {
+			return (readBigWord(line, 4)) << 4;
+
+		case RECORD_EXTENDED_LINEAR_ADDRESS:
 			// Extended Linear Address Record.
-			if (line.get(0) != 0x02)
+			if (byte0 != 0x02)
 				throw new HexFileException("Invalid address record");
-			baseAddress = (readBigWord(line, 4)) << 16;
-		} else if (line.get(3) != 0x03 && line.get(3) != 0x05) {
+			return (readBigWord(line, 4)) << 16;
+
+		case RECORD_START_SEGMENT_ADDRESS:
+		case RECORD_START_LINEAR_ADDRESS:
+			// do nothing
+			return baseAddress;
+
+		default:
 			// Invalid record type.
 			throw new HexFileException("Invalid record type");
 		}
-		return baseAddress;
+	}
+
+	private void copyLineToWords(ArrayList<Byte> line, int wordAddress) {
+		int lineSizeMinus5 = line.size() - 5;
+		for (int wordIndex = 0; (wordIndex << 1) < lineSizeMinus5; ++wordIndex) {
+			words.set(wordAddress + wordIndex, readLittleWord(line, (wordIndex << 1) + 4));
+		}
 	}
 
 	private static int DIGIT_COLON = 0x10;
@@ -382,20 +407,21 @@ public class HexFile {
 
 	private void saveRange(OutputStream file, IntRange range, boolean skipOnes) throws IOException {
 		int current = range.start();
+		final int post = range.post();
 		if (skipOnes) {
-			while (current < range.post()) {
-				while (current < range.post() && isAllOnes(current))
+			while (current < post) {
+				while (current < post && isAllOnes(current))
 					++current;
-				if (current >= range.post())
+				if (current >= post)
 					break;
 				int limit = current + 1;
-				while (limit < range.post() && !isAllOnes(limit))
+				while (limit < post && !isAllOnes(limit))
 					++limit;
 				saveRange(file, IntRange.getPost(current, limit));
 				current = limit;
 			}
 		} else {
-			saveRange(file, IntRange.getPost(current, range.post()));
+			saveRange(file, IntRange.getPost(current, post));
 		}
 	}
 
@@ -403,47 +429,17 @@ public class HexFile {
 		int current = range.start();
 		int currentSegment = ~0;
 		boolean needsSegments = (rangeIsNotShort(_programRange) || rangeIsNotShort(_configRange) || rangeIsNotShort(_dataRange));
-		int format;
-		if (_format == FORMAT_AUTO && _programBits == 16)
-			format = FORMAT_IHX32;
-		else
-			format = _format;
+		int format = (_format == FORMAT_AUTO && _programBits == 16) ? FORMAT_IHX32 : _format;
 		if (format == FORMAT_IHX8M)
 			needsSegments = false;
 		byte[] buffer = new byte[64];
+		
 		while (current < range.post()) {
 			int byteAddress = current * 2;
 			int segment = byteAddress >> 16;
-			if (needsSegments && segment != currentSegment) {
-				if (segment < 16 && _format != FORMAT_IHX32) {
-					// Over 64K boundary: output an Extended Segment Address
-					// Record.
-					currentSegment = segment;
-					segment <<= 12;
-					buffer[0] = (byte) 0x02;
-					buffer[1] = (byte) 0x00;
-					buffer[2] = (byte) 0x00;
-					buffer[3] = (byte) 0x02;
-					buffer[4] = (byte) (segment >> 8);
-					buffer[5] = (byte) segment;
-					writeLine(file, buffer, 6);
-				} else {
-					// Over 1M boundary: output an Extended Linear Address
-					// Record.
-					currentSegment = segment;
-					buffer[0] = (byte) 0x02;
-					buffer[1] = (byte) 0x00;
-					buffer[2] = (byte) 0x00;
-					buffer[3] = (byte) 0x04;
-					buffer[4] = (byte) (segment >> 8);
-					buffer[5] = (byte) segment;
-					writeLine(file, buffer, 6);
-				}
-			}
-			if ((current + 7) < range.post())
-				buffer[0] = (byte) 0x10;
-			else
-				buffer[0] = (byte) ((range.post() - current) * 2);
+			currentSegment = determineOutputExtendedAddress(file, currentSegment, needsSegments, buffer, segment);
+
+			buffer[0] = ((current + 7) < range.post()) ? (byte) 0x10 : (byte) ((range.post() - current) * 2);
 			buffer[1] = (byte) (byteAddress >> 8);
 			buffer[2] = (byte) byteAddress;
 			buffer[3] = (byte) 0x00;
@@ -456,6 +452,36 @@ public class HexFile {
 			}
 			writeLine(file, buffer, len);
 		}
+	}
+
+	private int determineOutputExtendedAddress(OutputStream file, int currentSegment, boolean needsSegments,
+			byte[] buffer, int segment) throws IOException {
+		if (needsSegments && segment != currentSegment) {
+			if (segment < 16 && _format != FORMAT_IHX32) {
+				// Over 64K boundary: output an Extended Segment Address
+				// Record.
+				currentSegment = outputExtendedAddress(file, buffer, segment, (byte) 0x02, 12);
+			} else {
+				// Over 1M boundary: output an Extended Linear Address
+				// Record.
+				currentSegment = outputExtendedAddress(file, buffer, segment, (byte) 0x04, 0);
+			}
+		}
+		return currentSegment;
+	}
+
+	private int outputExtendedAddress(OutputStream file, byte[] buffer, int segment, byte b3, int shift)
+			throws IOException {
+		int currentSegment = segment;
+		segment <<= shift;
+		buffer[0] = (byte) 0x02;
+		buffer[1] = (byte) 0x00;
+		buffer[2] = (byte) 0x00;
+		buffer[3] = (byte) b3;
+		buffer[4] = (byte) (segment >> 8);
+		buffer[5] = (byte) segment;
+		writeLine(file, buffer, 6);
+		return currentSegment;
 	}
 
 	private boolean rangeIsNotShort(IntRange range) {
