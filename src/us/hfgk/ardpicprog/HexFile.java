@@ -112,20 +112,23 @@ public class HexFile {
 	}
 
 	private short word(int address) {
-		for (Block block : getBlocks()) {
-			if (address >= block.getAddress() && address < (block.getAddress() + block.size())) {
-				return block.getData()[address - block.getAddress()];
-			}
-		}
-		return fullWord(address);
+		return blockmgr_get(address, fullWord(address));
 	}
 
-	private void setWord(int address, short word) {
-		int nextIndex = 0;
+	private short blockmgr_get(int index, short defaultValue) {
+		for (Block block : getBlocks()) {
+			if (index >= block.getAddress() && index < (block.getAddress() + block.size())) {
+				return block.getData()[index - block.getAddress()];
+			}
+		}		
+		return defaultValue;
+	}
+
+	private void blockmgr_set(int address, short word) {
+		int index = -1;
 
 		for (Block block : getBlocks()) {
-			int index = nextIndex;
-			++nextIndex;
+			++index;
 
 			if (address < block.getAddress()) {
 				if (address == (block.getAddress() - 1)) {
@@ -155,6 +158,7 @@ public class HexFile {
 				}
 			}
 		}
+		
 		getBlocks().add(new Block(address, 0, word));
 	}
 
@@ -214,7 +218,7 @@ public class HexFile {
 	}
 
 	public void read(ProgrammerPort port) throws IOException {
-		getBlocks().clear();
+		blockmgr_clear();
 
 		readPart(port, "program memory", _programRange);
 		readPart(port, "data memory", _dataRange);
@@ -223,21 +227,25 @@ public class HexFile {
 		log.info("done.");
 	}
 
+	private void blockmgr_clear() {
+		getBlocks().clear();
+	}
+
 	private void readBlock(ProgrammerPort port, int start, int end) throws IOException {
 		Block block = new Block(start, end - start + 1);
 		port.readData(start, end, block.getData(), 0);
-		insertBlock(block);
+		blockmgr_insertBlock(block);
 	}
 
-	private void insertBlock(Block block) {
-		int index = findInsertIndex(block.getAddress());
+	private void blockmgr_insertBlock(Block block) {
+		int index = blockmgr_findInsertIndex(block.getAddress());
 		if(index >= 0)
 			getBlocks().add(index, block);
 		else
 			getBlocks().add(block);
 	}
 
-	private int findInsertIndex(int address) {
+	private int blockmgr_findInsertIndex(int address) {
 		int index = -1;
 		for (Block block : getBlocks()) {
 			++index;
@@ -399,7 +407,7 @@ public class HexFile {
 
 			for (int index2 = 0; index2 < (line.size() - 5); index2 += 2) {
 				short word = readLittleWord(line, index2 + 4);
-				setWord(address + index2 / 2, word);
+				blockmgr_set(address + index2 / 2, word);
 			}
 		} else if (line.get(3) == 0x01) {
 			// Stop processing at the End Of File Record.
@@ -575,13 +583,19 @@ public class HexFile {
 	public void saveCC(String filename, boolean skipOnes) throws IOException {
 		OutputStream file = Common.openForWrite(filename);
 
-		for (Block block : getBlocks()) {
-			int start = block.getAddress();
-			int end = start + block.size() - 1;
-			saveRange(file, start, end, skipOnes);
+		for (IntPair extent : blockmgr_extents()) {
+			saveRange(file, extent.start, extent.end, skipOnes);
 		}
 		writeString(file, ":00000001FF\n");
 		file.close();
+	}
+	
+	private ArrayList<IntPair> blockmgr_extents() {
+		ArrayList<IntPair> result = new ArrayList<IntPair>();
+		for(Block block : getBlocks()) {
+			result.add(IntPair.get(block.getAddress(), block.getAddress() + block.size() - 1));
+		}
+		return result;
 	}
 
 	public void write(ProgrammerPort port, boolean forceCalibration) throws IOException {
@@ -630,7 +644,29 @@ public class HexFile {
 		}
 	}
 
+	private interface BlockWriter {
+		public void doWrite(int start, int end, short[] data, int offset) throws IOException;
+	}
+	
+	private static class PortBlockWriter implements BlockWriter {
+		private ProgrammerPort port;
+		private boolean forceCalibration;
+		
+		PortBlockWriter(ProgrammerPort port, boolean forceCalibration) {
+			this.port = port;
+			this.forceCalibration = forceCalibration;
+		}
+		
+		public void doWrite(int start, int end, short[] data, int offset) throws IOException {
+			port.writeData(start, end, data, offset, forceCalibration);
+		}
+	}
+	
 	private void writeBlock(ProgrammerPort port, int start, int end, boolean forceCalibration) throws IOException {
+		blockmgr_writeBlock(new PortBlockWriter(port, forceCalibration), start, end);
+	}
+
+	private void blockmgr_writeBlock(BlockWriter dw, int start, int end) throws IOException {
 		for (Block block : getBlocks()) {
 			int blockStart = block.getAddress();
 			int blockEnd = blockStart + block.size() - 1;
@@ -649,7 +685,7 @@ public class HexFile {
 					overlapEnd = end;
 				else
 					overlapEnd = blockEnd;
-				port.writeData(overlapStart, overlapEnd, block.getData(), offset, forceCalibration);
+				dw.doWrite(overlapStart, overlapEnd, block.getData(), offset);
 				count += overlapEnd - overlapStart + 1;
 			}
 		}
