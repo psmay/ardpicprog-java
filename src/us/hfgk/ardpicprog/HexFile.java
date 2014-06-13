@@ -127,16 +127,33 @@ public class HexFile {
 		return false;
 	}
 
-	private void readPart(ProgrammerPort port, String areaDesc, IntRange range) throws IOException {
-		if (!range.isEmpty()) {
-			log.info("Reading " + areaDesc + ",");
-			readBlock(port, range);
-		} else {
-			log.info("Skipped reading " + areaDesc + ",");
+	private static class RangeAndDescription {
+		final String description;
+		final IntRange range;
+
+		RangeAndDescription(String description, IntRange range) {
+			this.description = description;
+			this.range = range;
 		}
 	}
 
-	private boolean blankCheckPart(ProgrammerPort port, String areaDesc, IntRange range) throws IOException {
+	private RangeAndDescription[] getRanges() {
+		return new RangeAndDescription[] { new RangeAndDescription("program memory", _programRange),
+				new RangeAndDescription("data memory", _dataRange),
+				new RangeAndDescription("id words and fuses", _configRange) };
+	}
+
+	public boolean blankCheckRead(ProgrammerPort port) throws IOException {
+		for(RangeAndDescription rd : getRanges()) {
+			if(!blankCheckPart(port, rd))
+				return false;
+		}
+		return true;
+	}
+
+	private boolean blankCheckPart(ProgrammerPort port, RangeAndDescription rd) throws IOException {
+		String areaDesc = rd.description;
+		IntRange range = rd.range;
 		if (!range.isEmpty()) {
 			log.info("Blank checking " + areaDesc + ",");
 			if (blankCheckBlock(port, range)) {
@@ -152,19 +169,25 @@ public class HexFile {
 		}
 	}
 
-	public boolean blankCheckRead(ProgrammerPort port) throws IOException {
-		return blankCheckPart(port, "program memory", _programRange) && blankCheckPart(port, "data memory", _dataRange)
-				&& blankCheckPart(port, "id words and fuses", _configRange);
-	}
-
 	public void read(ProgrammerPort port) throws IOException {
 		words.clear();
-
-		readPart(port, "program memory", _programRange);
-		readPart(port, "data memory", _dataRange);
-		readPart(port, "id words and fuses", _configRange);
+		
+		for(RangeAndDescription rd : getRanges()) {
+			readPart(port, rd);
+		}
 
 		log.info("done.");
+	}
+
+	private void readPart(ProgrammerPort port, RangeAndDescription rd) throws IOException {
+		String areaDesc = rd.description;
+		IntRange range = rd.range;
+		if (!range.isEmpty()) {
+			log.info("Reading " + areaDesc + ",");
+			readBlock(port, range);
+		} else {
+			log.info("Skipped reading " + areaDesc + ",");
+		}
 	}
 
 	private void readBlock(ProgrammerPort source, IntRange range) throws IOException {
@@ -423,7 +446,7 @@ public class HexFile {
 		if (format == FORMAT_IHX8M)
 			needsSegments = false;
 		byte[] buffer = new byte[64];
-		
+
 		while (current < range.post()) {
 			int byteAddress = current * 2;
 			int segment = byteAddress >> 16;
