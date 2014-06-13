@@ -315,7 +315,7 @@ public class App {
 			Map<String, String> details = port.initDevice(options.device);
 
 			// Copy the device details into the hex file object.
-			HexFile hexFile = Actions.getHexFile(options, details);
+			HexFile hexFile = Actions.getHexFile(options.format, details);
 
 			// Dump the type of device and how much memory it has.
 			if (options.describeDevice) {
@@ -323,17 +323,17 @@ public class App {
 			}
 
 			if (options.blankCheck) {
-				Actions.doBlankCheck(options, port, hexFile);
+				Actions.doBlankCheck(port, hexFile);
 			}
 
 			// Read the input file.
 			if (!Common.stringEmpty(options.input)) {
-				Actions.doInput(options, hexFile);
+				Actions.doInput(options.input, hexFile);
 			}
 
 			// Copy the input to the CC output file.
 			if (!Common.stringEmpty(options.ccOutput)) {
-				Actions.doCCOutput(options, hexFile);
+				Actions.doCCOutput(options.ccOutput, options.skipOnes, hexFile);
 			}
 
 			// Erase the device if necessary. If --force-calibration is
@@ -342,18 +342,18 @@ public class App {
 			// use
 			// the "NOPRESERVE" option when erasing.
 			if (options.erase) {
-				Actions.doErase(options, port, hexFile);
+				Actions.doErase(options.forceCalibration, port, hexFile);
 			}
 
 			// Burn the input file into the device if requested.
 			if (options.burn) {
-				Actions.doBurn(options, port, hexFile);
+				Actions.doBurn(options.forceCalibration, port, hexFile);
 			}
 
 			// If we have an output file, then read the contents of the PIC into
 			// it.
 			if (!Common.stringEmpty(options.output)) {
-				Actions.doOutput(options, port, hexFile);
+				Actions.doOutput(options.output, options.skipOnes, port, hexFile);
 			}
 		} finally {
 			if (port != null) {

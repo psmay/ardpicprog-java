@@ -6,23 +6,22 @@ import java.io.InputStream;
 import java.util.Map;
 import java.util.logging.Logger;
 
-import us.hfgk.ardpicprog.ProgrammerPort.EraseException;
-
 import us.hfgk.ardpicprog.HexFile.HexFileException;
+import us.hfgk.ardpicprog.ProgrammerPort.EraseException;
 
 public class Actions {
 	private static final Logger log = Logger.getLogger(Actions.class.getName());
 
-	static void doBurn(App.Options options, ProgrammerPort port, HexFile hexFile) throws IOException {
-		hexFile.write(port, options.forceCalibration);
+	static void doBurn(boolean forceCalibration, ProgrammerPort port, HexFile hexFile) throws IOException {
+		hexFile.write(port, forceCalibration);
 	}
 
-	static void doCCOutput(App.Options options, HexFile hexFile) throws IOException {
-		hexFile.saveCC(options.ccOutput, options.skipOnes);
+	static void doCCOutput(String ccOutput, boolean skipOnes, HexFile hexFile) throws IOException {
+		hexFile.saveCC(ccOutput, skipOnes);
 	}
 
-	static void doErase(App.Options options, ProgrammerPort port, HexFile hexFile) throws IOException {
-		if (options.forceCalibration) {
+	static void doErase(boolean forceCalibration, ProgrammerPort port, HexFile hexFile) throws EraseException {
+		if (forceCalibration) {
 			if (hexFile.canForceCalibration()) {
 				log.info("Erasing and removing code protection.");
 				try {
@@ -43,8 +42,8 @@ public class Actions {
 		}
 	}
 
-	static void doInput(App.Options options, HexFile hexFile) throws FileNotFoundException, IOException {
-		InputStream file = Common.openForRead(options.input);
+	static void doInput(String input, HexFile hexFile) throws FileNotFoundException, IOException {
+		InputStream file = Common.openForRead(input);
 		hexFile.load(file);
 		file.close();
 	}
@@ -53,12 +52,12 @@ public class Actions {
 		log.info("Supported devices:\n" + port.devices() + "* = autodetected");
 	}
 
-	static void doOutput(App.Options options, ProgrammerPort port, HexFile hexFile) throws IOException {
+	static void doOutput(String output, boolean skipOnes, ProgrammerPort port, HexFile hexFile) throws IOException {
 		hexFile.read(port);
-		hexFile.save(options.output, options.skipOnes);
+		hexFile.save(output, skipOnes);
 	}
 
-	public static void doBlankCheck(App.Options options, ProgrammerPort port, HexFile hexFile) throws IOException {
+	static void doBlankCheck(ProgrammerPort port, HexFile hexFile) throws IOException {
 		log.info("Checking whether device is blank");
 		if (hexFile.blankCheckRead(port)) {
 			log.info("Device appears to be blank");
@@ -80,10 +79,10 @@ public class Actions {
 				+ " words, data memory: " + hexFile.dataSizeBytes() + " bytes.");
 	}
 
-	static HexFile getHexFile(App.Options options, Map<String, String> details) throws HexFileException {
+	static HexFile getHexFile(int format, Map<String, String> details) throws HexFileException {
 		HexFile hexFile = new HexFile();
 		hexFile.setDeviceDetails(details);
-		hexFile.setFormat(options.format);
+		hexFile.setFormat(format);
 		return hexFile;
 	}
 
