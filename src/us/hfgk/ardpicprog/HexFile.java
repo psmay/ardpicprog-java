@@ -7,6 +7,9 @@ import java.util.ArrayList;
 import java.util.Map;
 import java.util.logging.Logger;
 
+import us.hfgk.ardpicprog.SparseShortList.BlockReader;
+import us.hfgk.ardpicprog.SparseShortList.BlockWriter;
+
 public class HexFile {
 	private static final int READ_RECORD_OK = 0x7FFFFFFF;
 
@@ -16,26 +19,6 @@ public class HexFile {
 	public static final int FORMAT_IHX8M = 0;
 	public static final int FORMAT_IHX16 = 1;
 	public static final int FORMAT_IHX32 = 2;
-
-	private static class IntPair {
-		final int start;
-		final int end;
-
-		private IntPair(int start, int end) {
-			this.start = start;
-			if (end < start)
-				end = start - 1;
-			this.end = end;
-		}
-
-		private static IntPair get(int start, int end) {
-			return new IntPair(start, end);
-		}
-
-		private static IntPair empty(int start) {
-			return get(start, start - 1);
-		}
-	}
 
 	public String deviceName() {
 		return _deviceName;
@@ -58,26 +41,24 @@ public class HexFile {
 	}
 
 	private String _deviceName;
-	private IntPair _programRange = IntPair.get(0, 0x07FF);
-	private IntPair _configRange = IntPair.get(0x2000, 0x2007);
-	private IntPair _dataRange = IntPair.get(0x2100, 0x217F);
-	private IntPair _reservedRange = IntPair.get(0x0800, 0x07FF);
+	private IntRange _programRange = IntRange.get(0, 0x07FF);
+	private IntRange _configRange = IntRange.get(0x2000, 0x2007);
+	private IntRange _dataRange = IntRange.get(0x2100, 0x217F);
+	private IntRange _reservedRange = IntRange.get(0x0800, 0x07FF);
 	private int _programBits = 14;
 	private int _dataBits = 8;
 	private int _format = FORMAT_AUTO;
-	private ArrayList<Block> blocks = new ArrayList<Block>();
+
 	private int count = 0;
 
-	private ArrayList<Block> getBlocks() {
-		return blocks;
-	}
+	private SparseShortList words = new SparseShortList();
 
 	private static String fetchMap(Map<String, String> details, String key, String defValue) {
 		String value = details.get(key);
 		return (value == null) ? defValue : value;
 	}
 
-	static IntPair parseRange(String value) throws HexFileException {
+	static IntRange parseRange(String value) throws HexFileException {
 		int index = value.indexOf('-');
 		if (index == -1)
 			throw new HexFileException("Invalid range '" + value + "' (missing '-')");
@@ -88,7 +69,7 @@ public class HexFile {
 		end = Common.parseHex(value.substring(index + 1));
 		if (end == null)
 			throw new HexFileException("Invalid range '" + value + "' (end not a number)");
-		return IntPair.get(start, end);
+		return IntRange.get(start, end);
 	}
 
 	public void setDeviceDetails(Map<String, String> details) throws HexFileException {
@@ -107,59 +88,12 @@ public class HexFile {
 			throw new HexFileException("Invalid data word width " + _programBits);
 	}
 
-	private IntPair parseRangeUnlessEmpty(String value, int emptyStartAddress) throws HexFileException {
-		return Common.stringEmpty(value) ? IntPair.empty(emptyStartAddress) : parseRange(value);
+	private IntRange parseRangeUnlessEmpty(String value, int emptyStartAddress) throws HexFileException {
+		return Common.stringEmpty(value) ? IntRange.empty(emptyStartAddress) : parseRange(value);
 	}
 
 	private short word(int address) {
-		return blockmgr_get(address, fullWord(address));
-	}
-
-	private short blockmgr_get(int index, short defaultValue) {
-		for (Block block : getBlocks()) {
-			if (index >= block.getAddress() && index < (block.getAddress() + block.size())) {
-				return block.getData()[index - block.getAddress()];
-			}
-		}		
-		return defaultValue;
-	}
-
-	private void blockmgr_set(int address, short word) {
-		int index = -1;
-
-		for (Block block : getBlocks()) {
-			++index;
-
-			if (address < block.getAddress()) {
-				if (address == (block.getAddress() - 1)) {
-					// Prepend to the existing block.
-					block.prepend(word);
-				} else {
-					// Create a new block before this one.
-					getBlocks().add(index, new Block(address, 0, word));
-				}
-				return;
-			} else if (address < (block.getAddress() + block.size())) {
-				// Update a word in an existing block.
-				block.getData()[address - block.getAddress()] = word;
-				return;
-			} else if (address == (block.getAddress() + block.getData().length)) {
-				// Can we extend the current block without hitting the next
-				// block?
-				if (index < (getBlocks().size() - 1)) {
-					Block next = getBlocks().get(index + 1);
-					if (address < next.getAddress()) {
-						block.add(word);
-						return;
-					}
-				} else {
-					block.add(word);
-					return;
-				}
-			}
-		}
-		
-		getBlocks().add(new Block(address, 0, word));
+		return words.get(address, fullWord(address));
 	}
 
 	private short fullWord(int address) {
@@ -187,7 +121,7 @@ public class HexFile {
 		return false;
 	}
 
-	private void readPart(ProgrammerPort port, String areaDesc, IntPair range) throws IOException {
+	private void readPart(ProgrammerPort port, String areaDesc, IntRange range) throws IOException {
 		if (range.start <= range.end) {
 			log.info("Reading " + areaDesc + ",");
 			readBlock(port, range.start, range.end);
@@ -196,7 +130,7 @@ public class HexFile {
 		}
 	}
 
-	private boolean blankCheckPart(ProgrammerPort port, String areaDesc, IntPair range) throws IOException {
+	private boolean blankCheckPart(ProgrammerPort port, String areaDesc, IntRange range) throws IOException {
 		if (range.start <= range.end) {
 			log.info("Blank checking " + areaDesc + ",");
 			if (blankCheckBlock(port, range.start, range.end)) {
@@ -218,7 +152,7 @@ public class HexFile {
 	}
 
 	public void read(ProgrammerPort port) throws IOException {
-		blockmgr_clear();
+		words.clear();
 
 		readPart(port, "program memory", _programRange);
 		readPart(port, "data memory", _dataRange);
@@ -227,41 +161,16 @@ public class HexFile {
 		log.info("done.");
 	}
 
-	private void blockmgr_clear() {
-		getBlocks().clear();
-	}
-
 	private void readBlock(ProgrammerPort port, int start, int end) throws IOException {
-		Block block = new Block(start, end - start + 1);
-		port.readData(start, end, block.getData(), 0);
-		blockmgr_insertBlock(block);
-	}
-
-	private void blockmgr_insertBlock(Block block) {
-		int index = blockmgr_findInsertIndex(block.getAddress());
-		if(index >= 0)
-			getBlocks().add(index, block);
-		else
-			getBlocks().add(block);
-	}
-
-	private int blockmgr_findInsertIndex(int address) {
-		int index = -1;
-		for (Block block : getBlocks()) {
-			++index;
-			if (address <= block.getAddress()) {
-				return index;
-			}
-		}
-		return -1;
+		words.readBlock(new PortBlockIO(port), IntRange.get(start, end));
 	}
 
 	private boolean blankCheckBlock(ProgrammerPort port, int start, int end) throws IOException {
-		Block block = new Block(start, end - start + 1);
-		port.readData(start, end, block.getData(), 0);
+		short[] buf = new short[end - start + 1];
+		port.readData(start, end, buf, 0);
 
 		int i = start;
-		for (short word : block.getData()) {
+		for (short word : buf) {
 			if (!wouldBeAllOnes(i, word)) {
 				return false;
 			}
@@ -407,7 +316,7 @@ public class HexFile {
 
 			for (int index2 = 0; index2 < (line.size() - 5); index2 += 2) {
 				short word = readLittleWord(line, index2 + 4);
-				blockmgr_set(address + index2 / 2, word);
+				words.set(address + index2 / 2, word);
 			}
 		} else if (line.get(3) == 0x01) {
 			// Stop processing at the End Of File Record.
@@ -583,19 +492,11 @@ public class HexFile {
 	public void saveCC(String filename, boolean skipOnes) throws IOException {
 		OutputStream file = Common.openForWrite(filename);
 
-		for (IntPair extent : blockmgr_extents()) {
+		for (IntRange extent : words.extents()) {
 			saveRange(file, extent.start, extent.end, skipOnes);
 		}
 		writeString(file, ":00000001FF\n");
 		file.close();
-	}
-	
-	private ArrayList<IntPair> blockmgr_extents() {
-		ArrayList<IntPair> result = new ArrayList<IntPair>();
-		for(Block block : getBlocks()) {
-			result.add(IntPair.get(block.getAddress(), block.getAddress() + block.size() - 1));
-		}
-		return result;
 	}
 
 	public void write(ProgrammerPort port, boolean forceCalibration) throws IOException {
@@ -613,7 +514,7 @@ public class HexFile {
 		log.info("done.");
 	}
 
-	private void writeProgramSubrange(ProgrammerPort port, boolean forceCalibration, IntPair range, String desc)
+	private void writeProgramSubrange(ProgrammerPort port, boolean forceCalibration, IntRange range, String desc)
 			throws IOException {
 		if (range.start <= range.end) {
 			log.info("Burning " + desc + ",");
@@ -632,7 +533,7 @@ public class HexFile {
 		}
 	}
 
-	private void writeSubrange(ProgrammerPort port, boolean forceCalibration, IntPair range, String desc)
+	private void writeSubrange(ProgrammerPort port, boolean forceCalibration, IntRange range, String desc)
 			throws IOException {
 		if (range.start <= range.end) {
 			log.info("burning " + desc + ",");
@@ -644,51 +545,31 @@ public class HexFile {
 		}
 	}
 
-	private interface BlockWriter {
-		public void doWrite(int start, int end, short[] data, int offset) throws IOException;
-	}
-	
-	private static class PortBlockWriter implements BlockWriter {
+	private static class PortBlockIO implements BlockWriter, BlockReader {
 		private ProgrammerPort port;
 		private boolean forceCalibration;
-		
-		PortBlockWriter(ProgrammerPort port, boolean forceCalibration) {
+
+		PortBlockIO(ProgrammerPort port) {
+			this(port, false);
+		}
+
+		PortBlockIO(ProgrammerPort port, boolean forceCalibration) {
 			this.port = port;
 			this.forceCalibration = forceCalibration;
 		}
-		
-		public void doWrite(int start, int end, short[] data, int offset) throws IOException {
-			port.writeData(start, end, data, offset, forceCalibration);
+
+		public void doWrite(IntRange range, short[] data, int offset) throws IOException {
+			port.writeData(range.start, range.end, data, offset, forceCalibration);
+		}
+
+		@Override
+		public void doRead(IntRange range, short[] data, int offset) throws IOException {
+			port.readData(range.start, range.end, data, offset);
 		}
 	}
-	
+
 	private void writeBlock(ProgrammerPort port, int start, int end, boolean forceCalibration) throws IOException {
-		blockmgr_writeBlock(new PortBlockWriter(port, forceCalibration), start, end);
-	}
-
-	private void blockmgr_writeBlock(BlockWriter dw, int start, int end) throws IOException {
-		for (Block block : getBlocks()) {
-			int blockStart = block.getAddress();
-			int blockEnd = blockStart + block.size() - 1;
-			if (start <= blockEnd && end >= blockStart) {
-				int offset = 0;
-
-				int overlapStart;
-				int overlapEnd;
-				if (start > blockStart) {
-					offset += (start - blockStart);
-					overlapStart = start;
-				} else {
-					overlapStart = blockStart;
-				}
-				if (end < blockEnd)
-					overlapEnd = end;
-				else
-					overlapEnd = blockEnd;
-				dw.doWrite(overlapStart, overlapEnd, block.getData(), offset);
-				count += overlapEnd - overlapStart + 1;
-			}
-		}
+		count += words.writeBlock(new PortBlockIO(port, forceCalibration), start, end);
 	}
 
 	public static final class HexFileException extends IOException {

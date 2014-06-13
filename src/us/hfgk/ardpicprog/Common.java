@@ -161,6 +161,38 @@ abstract class Common {
 		return (s == null) || (s.isEmpty());
 	}
 
+	// Intended as an equivalent to Arrays.copyOf(), but with the copy extended
+	// or truncated on the left rather than the right.
+	static short[] rightCopyOf(short[] src, final int newSize) {
+		short[] dst = new short[newSize];
+
+		final int currentSize = src.length;
+
+		final int dstEndIndex = newSize;
+
+		// If the copy is right-aligned, this is the ideal dst index of the
+		// first src element.
+		int dstIndexOfSrc0 = newSize - currentSize;
+
+		// We can't copy negative indices, so truncate on left if necessary.
+		int dstStartIndex = (dstIndexOfSrc0 < 0) ? 0 : dstIndexOfSrc0;
+
+		// If truncation happened on dst, do it on src also.
+		int srcStartIndex = dstStartIndex - dstIndexOfSrc0;
+
+		// Now we have the number of elements that will actually be copied.
+		int copyLength = dstEndIndex - dstStartIndex;
+
+		if (copyLength > 0) {
+			System.arraycopy(src, srcStartIndex, dst, dstStartIndex, copyLength);
+		}
+
+		// We would do zero-fill for any remaining elements on the left, but
+		// Java did that for us when the array was created.
+
+		return dst;
+	}
+
 	private static final String[] copyingMessage = { "                    GNU GENERAL PUBLIC LICENSE",
 			"                       Version 3, 29 June 2007", "",
 			" Copyright (C) 2007 Free Software Foundation, Inc. <http://fsf.org/>",
