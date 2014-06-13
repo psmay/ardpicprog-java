@@ -101,7 +101,6 @@ public class ProgrammerPort {
 		// If the DeviceID is "0000" but we have a DeviceName, then the device
 		// is an EEPROM that needs a manual override to change the default.
 		Map<String, String> details = readDeviceInfo();
-		// Map<String,String>::const_iterator it = details.find("DeviceName");
 		String detailsDeviceName = details.get("DeviceName");
 		String detailsDeviceID = details.get("DeviceID");
 

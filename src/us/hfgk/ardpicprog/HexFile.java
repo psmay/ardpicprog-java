@@ -112,11 +112,9 @@ public class HexFile {
 	}
 
 	private short word(int address) {
-		// ArrayList<HexFileBlock>::_iterator it;
-		for (Block it : getBlocks()) {
-			// for (it = blocks.begin(); it != blocks.end(); ++it) {
-			if (address >= it.getAddress() && address < (it.getAddress() + it.size())) {
-				return it.getData()[address - it.getAddress()];
+		for (Block block : getBlocks()) {
+			if (address >= block.getAddress() && address < (block.getAddress() + block.size())) {
+				return block.getData()[address - block.getAddress()];
 			}
 		}
 		return fullWord(address);
@@ -125,26 +123,24 @@ public class HexFile {
 	private void setWord(int address, short word) {
 		int nextIndex = 0;
 
-		for (Block it : getBlocks()) {
+		for (Block block : getBlocks()) {
 			int index = nextIndex;
 			++nextIndex;
 
-			Block block = it;
 			if (address < block.getAddress()) {
 				if (address == (block.getAddress() - 1)) {
 					// Prepend to the existing block.
 					block.prepend(word);
 				} else {
 					// Create a new block before this one.
-					Block newBlock = new Block(address, 0, word);
-					getBlocks().add(index, newBlock);
+					getBlocks().add(index, new Block(address, 0, word));
 				}
 				return;
-			} else if (address < (it.getAddress() + it.size())) {
+			} else if (address < (block.getAddress() + block.size())) {
 				// Update a word in an existing block.
 				block.getData()[address - block.getAddress()] = word;
 				return;
-			} else if (address == (it.getAddress() + it.getData().length)) {
+			} else if (address == (block.getAddress() + block.getData().length)) {
 				// Can we extend the current block without hitting the next
 				// block?
 				if (index < (getBlocks().size() - 1)) {
@@ -159,8 +155,7 @@ public class HexFile {
 				}
 			}
 		}
-		Block block = new Block(address, 0, word);
-		getBlocks().add(block);
+		getBlocks().add(new Block(address, 0, word));
 	}
 
 	private short fullWord(int address) {
@@ -231,17 +226,26 @@ public class HexFile {
 	private void readBlock(ProgrammerPort port, int start, int end) throws IOException {
 		Block block = new Block(start, end - start + 1);
 		port.readData(start, end, block.getData(), 0);
-		// ArrayList<HexFileBlock>::iterator it;
-		// for (it = blocks.begin(); it != blocks.end(); ++it) {
-		int nextIndex = 0;
-		for (Block it : getBlocks()) {
-			int index = nextIndex++;
-			if (start <= it.getAddress()) {
-				getBlocks().add(index, block);
-				return;
+		insertBlock(block);
+	}
+
+	private void insertBlock(Block block) {
+		int index = findInsertIndex(block.getAddress());
+		if(index >= 0)
+			getBlocks().add(index, block);
+		else
+			getBlocks().add(block);
+	}
+
+	private int findInsertIndex(int address) {
+		int index = -1;
+		for (Block block : getBlocks()) {
+			++index;
+			if (address <= block.getAddress()) {
+				return index;
 			}
 		}
-		getBlocks().add(block);
+		return -1;
 	}
 
 	private boolean blankCheckBlock(ProgrammerPort port, int start, int end) throws IOException {
@@ -571,9 +575,9 @@ public class HexFile {
 	public void saveCC(String filename, boolean skipOnes) throws IOException {
 		OutputStream file = Common.openForWrite(filename);
 
-		for (Block it : getBlocks()) {
-			int start = it.getAddress();
-			int end = start + it.size() - 1;
+		for (Block block : getBlocks()) {
+			int start = block.getAddress();
+			int end = start + block.size() - 1;
 			saveRange(file, start, end, skipOnes);
 		}
 		writeString(file, ":00000001FF\n");
@@ -627,9 +631,9 @@ public class HexFile {
 	}
 
 	private void writeBlock(ProgrammerPort port, int start, int end, boolean forceCalibration) throws IOException {
-		for (Block it : getBlocks()) {
-			int blockStart = it.getAddress();
-			int blockEnd = blockStart + it.size() - 1;
+		for (Block block : getBlocks()) {
+			int blockStart = block.getAddress();
+			int blockEnd = blockStart + block.size() - 1;
 			if (start <= blockEnd && end >= blockStart) {
 				int offset = 0;
 
@@ -645,7 +649,7 @@ public class HexFile {
 					overlapEnd = end;
 				else
 					overlapEnd = blockEnd;
-				port.writeData(overlapStart, overlapEnd, it.getData(), offset, forceCalibration);
+				port.writeData(overlapStart, overlapEnd, block.getData(), offset, forceCalibration);
 				count += overlapEnd - overlapStart + 1;
 			}
 		}
