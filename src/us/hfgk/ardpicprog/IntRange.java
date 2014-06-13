@@ -54,4 +54,15 @@ class IntRange {
 	boolean isEmpty() {
 		return _start >= _post;
 	}
+	
+	IntRange overlapWithContainedRange(IntRange inner) {
+		return containsRange(inner) ? findOverlapWithContainedRange(this, inner) : null;
+	}
+	
+	private static IntRange findOverlapWithContainedRange(IntRange outer, IntRange inner) {
+		// Assumes outer.containsRange(inner)
+		final int overlapStart = outer.start() > inner.start() ? outer.start() : inner.start();
+		final int overlapPost = outer.post() < inner.post() ? outer.post() : inner.post();
+		return IntRange.getPost(overlapStart, overlapPost);
+	}
 }

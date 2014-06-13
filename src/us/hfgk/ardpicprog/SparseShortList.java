@@ -37,11 +37,11 @@ class SparseShortList {
 			--startIndex;
 			data[0] = word;
 		}
-		
+
 		private IntRange recentRange = null;
-		
+
 		public IntRange currentRange() {
-			if(recentRange == null) {
+			if (recentRange == null) {
 				recentRange = IntRange.getSize(startIndex, data.length);
 			}
 			return recentRange;
@@ -80,12 +80,12 @@ class SparseShortList {
 		}
 		return result;
 	}
-	
+
 	short get(int index, short defaultValue) {
 		Block block = getContainingBlock(index);
 		return (block != null) ? block.data[index - block.startIndex] : defaultValue;
 	}
-	
+
 	Short get(int index) {
 		Block block = getContainingBlock(index);
 		return (block != null) ? block.data[index - block.startIndex] : null;
@@ -94,7 +94,7 @@ class SparseShortList {
 	private final Block getContainingBlock(int index) {
 		for (Block block : blocks) {
 			if (index >= block.startIndex && index < (block.startIndex + block.data.length)) {
-				return block;				
+				return block;
 			}
 		}
 		return null;
@@ -148,25 +148,10 @@ class SparseShortList {
 		int count = 0;
 		for (Block block : blocks) {
 			IntRange blockRange = block.currentRange();
-			if (range.containsRange(blockRange)) {
-				int offset = 0;
-
-				int overlapStart;
-				int overlapPost;
-				
-				if (range.start() > blockRange.start()) {
-					offset += (range.start() - blockRange.start());
-					overlapStart = range.start();
-				} else {
-					overlapStart = blockRange.start();
-				}
-				if (range.post() < blockRange.post())
-					overlapPost = range.post();
-				else
-					overlapPost = blockRange.post();
-				IntRange overlap = IntRange.getPost(overlapStart, overlapPost);
-				bw.doWrite(overlap, block.data, offset);
-				count += overlapPost - overlapStart;
+			IntRange overlap = range.overlapWithContainedRange(blockRange);
+			if(overlap != null) {				
+				bw.doWrite(overlap, block.data, overlap.start() - blockRange.start());
+				count += overlap.size();
 			}
 		}
 		return count;
