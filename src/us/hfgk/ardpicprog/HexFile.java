@@ -124,7 +124,7 @@ public class HexFile {
 	private void readPart(ProgrammerPort port, String areaDesc, IntRange range) throws IOException {
 		if (range.start <= range.end) {
 			log.info("Reading " + areaDesc + ",");
-			readBlock(port, range.start, range.end);
+			readBlock(port, range);
 		} else {
 			log.info("Skipped reading " + areaDesc + ",");
 		}
@@ -133,7 +133,7 @@ public class HexFile {
 	private boolean blankCheckPart(ProgrammerPort port, String areaDesc, IntRange range) throws IOException {
 		if (range.start <= range.end) {
 			log.info("Blank checking " + areaDesc + ",");
-			if (blankCheckBlock(port, range.start, range.end)) {
+			if (blankCheckBlock(port, range)) {
 				log.info("Looks blank");
 				return true;
 			} else {
@@ -161,15 +161,15 @@ public class HexFile {
 		log.info("done.");
 	}
 
-	private void readBlock(ProgrammerPort port, int start, int end) throws IOException {
-		words.readBlock(new PortBlockIO(port), IntRange.get(start, end));
+	private void readBlock(ProgrammerPort port, IntRange range) throws IOException {
+		words.readBlock(new PortBlockIO(port), range);
 	}
 
-	private boolean blankCheckBlock(ProgrammerPort port, int start, int end) throws IOException {
-		short[] buf = new short[end - start + 1];
-		port.readData(start, end, buf, 0);
+	private boolean blankCheckBlock(ProgrammerPort port, IntRange range) throws IOException {
+		short[] buf = new short[range.end - range.start + 1];
+		port.readData(range, buf, 0);
 
-		int i = start;
+		int i = range.start;
 		for (short word : buf) {
 			if (!wouldBeAllOnes(i, word)) {
 				return false;
@@ -366,43 +366,44 @@ public class HexFile {
 			return false;
 		}
 
-		saveRange(file, _programRange.start, _programRange.end, skipOnes);
+		saveRange(file, IntRange.get(_programRange.start, _programRange.end), skipOnes);
 		if (_configRange.start <= _configRange.end) {
 			if ((_configRange.end - _configRange.start + 1) >= 8) {
-				saveRange(file, _configRange.start, _configRange.start + 5, skipOnes);
+				saveRange(file, IntRange.get(_configRange.start, _configRange.start + 5), skipOnes);
 				// Don't bother saving the device ID word at _configRange.start
 				// + 6.
-				saveRange(file, _configRange.start + 7, _configRange.end, skipOnes);
+				saveRange(file, IntRange.get(_configRange.start + 7, _configRange.end), skipOnes);
 			} else {
-				saveRange(file, _configRange.start, _configRange.end, skipOnes);
+				saveRange(file, _configRange, skipOnes);
 			}
 		}
-		saveRange(file, _dataRange.start, _dataRange.end, skipOnes);
+		saveRange(file, _dataRange, skipOnes);
 		writeString(file, ":00000001FF\n");
 		file.close();
 		return true;
 	}
 
-	private void saveRange(OutputStream file, int start, int end, boolean skipOnes) throws IOException {
+	private void saveRange(OutputStream file, IntRange range, boolean skipOnes) throws IOException {
+		int current = range.start;
 		if (skipOnes) {
-			while (start <= end) {
-				while (start <= end && isAllOnes(start))
-					++start;
-				if (start > end)
+			while (current <= range.end) {
+				while (current <= range.end && isAllOnes(current))
+					++current;
+				if (current > range.end)
 					break;
-				int limit = start + 1;
-				while (limit <= end && !isAllOnes(limit))
+				int limit = current + 1;
+				while (limit <= range.end && !isAllOnes(limit))
 					++limit;
-				saveRange(file, start, limit - 1);
-				start = limit;
+				saveRange(file, IntRange.get(current, limit - 1));
+				current = limit;
 			}
 		} else {
-			saveRange(file, start, end);
+			saveRange(file, IntRange.get(current, range.end));
 		}
 	}
 
-	private void saveRange(OutputStream file, int start, int end) throws IOException {
-		int current = start;
+	private void saveRange(OutputStream file, IntRange range) throws IOException {
+		int current = range.start;
 		int currentSegment = ~0;
 		boolean needsSegments = (_programRange.end >= 0x10000 || _configRange.end >= 0x10000 || _dataRange.end >= 0x10000);
 		int format;
@@ -413,7 +414,7 @@ public class HexFile {
 		if (format == FORMAT_IHX8M)
 			needsSegments = false;
 		byte[] buffer = new byte[64];
-		while (current <= end) {
+		while (current <= range.end) {
 			int byteAddress = current * 2;
 			int segment = byteAddress >> 16;
 			if (needsSegments && segment != currentSegment) {
@@ -442,15 +443,15 @@ public class HexFile {
 					writeLine(file, buffer, 6);
 				}
 			}
-			if ((current + 7) <= end)
+			if ((current + 7) <= range.end)
 				buffer[0] = (byte) 0x10;
 			else
-				buffer[0] = (byte) ((end - current + 1) * 2);
+				buffer[0] = (byte) ((range.end - current + 1) * 2);
 			buffer[1] = (byte) (byteAddress >> 8);
 			buffer[2] = (byte) byteAddress;
 			buffer[3] = (byte) 0x00;
 			int len = 4;
-			while (current <= end && len < (4 + 16)) {
+			while (current <= range.end && len < (4 + 16)) {
 				short value = word(current);
 				buffer[len++] = (byte) value;
 				buffer[len++] = (byte) (value >> 8);
@@ -493,7 +494,7 @@ public class HexFile {
 		OutputStream file = Common.openForWrite(filename);
 
 		for (IntRange extent : words.extents()) {
-			saveRange(file, extent.start, extent.end, skipOnes);
+			saveRange(file, extent, skipOnes);
 		}
 		writeString(file, ":00000001FF\n");
 		file.close();
@@ -521,11 +522,11 @@ public class HexFile {
 			flush();
 			if (forceCalibration || _reservedRange.start > _reservedRange.end) {
 				// Calibration forced or no reserved words to worry about.
-				writeBlock(port, range.start, range.end, forceCalibration);
+				writeBlock(port, range, forceCalibration);
 			} else {
 				// Assumes: reserved words are always at the end of program
 				// memory.
-				writeBlock(port, range.start, range.start - 1, forceCalibration);
+				writeBlock(port, IntRange.empty(range.start), forceCalibration);
 			}
 			reportCount();
 		} else {
@@ -538,7 +539,7 @@ public class HexFile {
 		if (range.start <= range.end) {
 			log.info("burning " + desc + ",");
 			flush();
-			writeBlock(port, range.start, range.end, forceCalibration);
+			writeBlock(port, range, forceCalibration);
 			reportCount();
 		} else {
 			log.info("skipped burning " + desc + ",");
@@ -559,17 +560,17 @@ public class HexFile {
 		}
 
 		public void doWrite(IntRange range, short[] data, int offset) throws IOException {
-			port.writeData(range.start, range.end, data, offset, forceCalibration);
+			port.writeData(range, data, offset, forceCalibration);
 		}
 
 		@Override
 		public void doRead(IntRange range, short[] data, int offset) throws IOException {
-			port.readData(range.start, range.end, data, offset);
+			port.readData(range, data, offset);
 		}
 	}
 
-	private void writeBlock(ProgrammerPort port, int start, int end, boolean forceCalibration) throws IOException {
-		count += words.writeBlock(new PortBlockIO(port, forceCalibration), start, end);
+	private void writeBlock(ProgrammerPort port, IntRange range, boolean forceCalibration) throws IOException {
+		count += words.writeBlock(new PortBlockIO(port, forceCalibration), range);
 	}
 
 	public static final class HexFileException extends IOException {

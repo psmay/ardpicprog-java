@@ -133,24 +133,24 @@ class SparseShortList {
 		insertBlock(block);
 	}
 
-	int writeBlock(BlockWriter bw, int start, int end) throws IOException {
+	int writeBlock(BlockWriter bw, IntRange range) throws IOException {
 		int count = 0;
 		for (Block block : blocks) {
 			int blockStart = block.startIndex;
 			int blockEnd = blockStart + block.data.length - 1;
-			if (start <= blockEnd && end >= blockStart) {
+			if (range.start <= blockEnd && range.end >= blockStart) {
 				int offset = 0;
 
 				int overlapStart;
 				int overlapEnd;
-				if (start > blockStart) {
-					offset += (start - blockStart);
-					overlapStart = start;
+				if (range.start > blockStart) {
+					offset += (range.start - blockStart);
+					overlapStart = range.start;
 				} else {
 					overlapStart = blockStart;
 				}
-				if (end < blockEnd)
-					overlapEnd = end;
+				if (range.end < blockEnd)
+					overlapEnd = range.end;
 				else
 					overlapEnd = blockEnd;
 				IntRange overlap = IntRange.get(overlapStart, overlapEnd);
