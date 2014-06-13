@@ -7,9 +7,6 @@ import java.util.ArrayList;
 import java.util.Map;
 import java.util.logging.Logger;
 
-import us.hfgk.ardpicprog.SparseShortList.BlockReader;
-import us.hfgk.ardpicprog.SparseShortList.BlockWriter;
-
 public class HexFile {
 	private static final int READ_RECORD_OK = 0x7FFFFFFF;
 
@@ -162,12 +159,12 @@ public class HexFile {
 	}
 
 	private void readBlock(ProgrammerPort port, IntRange range) throws IOException {
-		words.readBlock(new PortBlockIO(port), range);
+		words.readBlock(port.getBlockReader(), range);
 	}
 
 	private boolean blankCheckBlock(ProgrammerPort port, IntRange range) throws IOException {
-		short[] buf = new short[range.size()];
-		port.readData(range, buf, 0);
+		final short[] buf = new short[range.size()];
+		port.getBlockReader().doRead(range, buf, 0);
 
 		int i = range.start();
 		for (short word : buf) {
@@ -550,32 +547,8 @@ public class HexFile {
 		}
 	}
 
-
-	private static class PortBlockIO implements BlockWriter, BlockReader {
-		private ProgrammerPort port;
-		private boolean forceCalibration;
-
-		PortBlockIO(ProgrammerPort port) {
-			this(port, false);
-		}
-
-		PortBlockIO(ProgrammerPort port, boolean forceCalibration) {
-			this.port = port;
-			this.forceCalibration = forceCalibration;
-		}
-
-		public void doWrite(IntRange range, short[] data, int offset) throws IOException {
-			port.writeData(range, data, offset, forceCalibration);
-		}
-
-		@Override
-		public void doRead(IntRange range, short[] data, int offset) throws IOException {
-			port.readData(range, data, offset);
-		}
-	}
-
 	private void writeBlock(ProgrammerPort port, IntRange range, boolean forceCalibration) throws IOException {
-		count += words.writeBlock(new PortBlockIO(port, forceCalibration), range);
+		count += words.writeBlock(port.getBlockWriter(forceCalibration), range);
 	}
 
 	public static final class HexFileException extends IOException {

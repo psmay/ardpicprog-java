@@ -16,7 +16,7 @@ class SparseShortList {
 				minCapacity = data.length;
 			this.data = Arrays.copyOf(data, minCapacity);
 		}
-		
+
 		public Block(IntRange range, short... data) {
 			this(range.start(), range.size(), data);
 		}
@@ -151,9 +151,12 @@ class SparseShortList {
 	int writeBlock(BlockWriter bw, IntRange range) throws IOException {
 		int count = 0;
 		for (Block block : blocks) {
+			// Finds the intersection of a block's range and the requested
+			// range. If there is overlap, the applicable part of the blocks
+			// data is copied.
 			IntRange blockRange = block.currentRange();
 			IntRange overlap = range.overlapWithContainedRange(blockRange);
-			if(overlap != null) {				
+			if (overlap != null) {
 				bw.doWrite(overlap, block.data, overlap.start() - blockRange.start());
 				count += overlap.size();
 			}

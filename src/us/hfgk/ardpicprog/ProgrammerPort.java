@@ -9,6 +9,9 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.logging.Logger;
 
+import us.hfgk.ardpicprog.SparseShortList.BlockReader;
+import us.hfgk.ardpicprog.SparseShortList.BlockWriter;
+
 public class ProgrammerPort {
 	private static final Logger log = Logger.getLogger(ProgrammerPort.class.getName());
 
@@ -180,34 +183,6 @@ public class ProgrammerPort {
 		return readMultiLineResponse();
 	}
 
-	void readData(IntRange range, short[] data, int offset) throws IOException, EOFException,
-			ProgrammerException {
-		int current = range.start();
-		byte[] buffer = new byte[256];
-
-		commandReadBin(range);
-
-		while (current < range.post()) {
-			int pktlen = readProgrammerByte();
-			if (pktlen < 0)
-				throw new EOFException();
-			else if (pktlen == 0)
-				break;
-			read(buffer, 0, pktlen);
-			int numWords = pktlen / 2;
-			if ((numWords) > (range.post() - current))
-				numWords = range.post() - current;
-			for (int index = 0; index < numWords; ++index) {
-				data[offset + index] = (short) ((buffer[index * 2] & 0xFF) | ((buffer[index * 2 + 1] & 0xFF) << 8));
-			}
-			offset += numWords;
-			current += numWords;
-		}
-		if (current < range.post()) {
-			throw new ProgrammerException("Could not fill entire buffer");
-		}
-	}
-
 	private void read(byte[] data, int offset, int length) throws IOException {
 		while (length > 0) {
 			int ch = readProgrammerByte();
@@ -298,33 +273,6 @@ public class ProgrammerPort {
 		}
 	}
 
-	void writeData(IntRange range, short[] data, int offset, boolean force) throws IOException {
-		ByteArrayOutputStream buffer = new ByteArrayOutputStream(BINARY_WORD_TRANSFER_MAX * 2 + 1);
-		int wordlen = (range.size());
-
-		if (wordlen == 5) {
-			// Cannot use "WRITEBIN" for exactly 10 bytes, so use "WRITE"
-			// instead.
-
-			commandWrite(range.start(), force, Arrays.copyOfRange(data, 0, 5));
-		}
-
-		commandWriteBin(range.start(), force);
-		while (wordlen >= BINARY_WORD_TRANSFER_MAX) {
-			bufferWords(data, offset, BINARY_WORD_TRANSFER_MAX, buffer);
-			writePacketAndClear(buffer);
-			offset += BINARY_WORD_TRANSFER_MAX;
-			wordlen -= BINARY_WORD_TRANSFER_MAX;
-		}
-		if (wordlen > 0) {
-			bufferWords(data, offset, wordlen, buffer);
-			writePacketAndClear(buffer);
-		}
-
-		// Terminating packet.
-		writePacket(new byte[] { 0x00 }, 1);
-	}
-
 	private void bufferWords(short[] data, int srcOffset, int wordCount, ByteArrayOutputStream os) throws IOException {
 		int outputLength = (byte) (wordCount << 1);
 		os.write((byte) outputLength);
@@ -402,6 +350,83 @@ public class ProgrammerPort {
 			String response = port.readProgrammerLine();
 			if (!response.equals("OK"))
 				throw new PacketResponseException("Packet response was '" + response + "'; expected 'OK'");
+		}
+	}
+	
+	BlockReader getBlockReader() {
+		return new PortBlockIO(this);
+	}
+	
+	BlockWriter getBlockWriter(boolean forceCalibration) {
+		return new PortBlockIO(this, forceCalibration);
+	}
+	
+	private static class PortBlockIO implements BlockWriter, BlockReader {
+		private ProgrammerPort port;
+		private boolean forceCalibration;
+
+		PortBlockIO(ProgrammerPort port) {
+			this(port, false);
+		}
+
+		PortBlockIO(ProgrammerPort port, boolean forceCalibration) {
+			this.port = port;
+			this.forceCalibration = forceCalibration;
+		}
+
+		public void doWrite(IntRange range, short[] data, int offset) throws IOException {
+			ByteArrayOutputStream buffer = new ByteArrayOutputStream(ProgrammerPort.BINARY_WORD_TRANSFER_MAX * 2 + 1);
+			int wordlen = (range.size());
+			
+			if (wordlen == 5) {
+				// Cannot use "WRITEBIN" for exactly 10 bytes, so use "WRITE"
+				// instead.
+			
+				port.commandWrite(range.start(), forceCalibration, Arrays.copyOfRange(data, 0, 5));
+			}
+			
+			port.commandWriteBin(range.start(), forceCalibration);
+			while (wordlen >= ProgrammerPort.BINARY_WORD_TRANSFER_MAX) {
+				port.bufferWords(data, offset, ProgrammerPort.BINARY_WORD_TRANSFER_MAX, buffer);
+				port.writePacketAndClear(buffer);
+				offset += ProgrammerPort.BINARY_WORD_TRANSFER_MAX;
+				wordlen -= ProgrammerPort.BINARY_WORD_TRANSFER_MAX;
+			}
+			if (wordlen > 0) {
+				port.bufferWords(data, offset, wordlen, buffer);
+				port.writePacketAndClear(buffer);
+			}
+			
+			// Terminating packet.
+			port.writePacket(new byte[] { 0x00 }, 1);
+		}
+
+		@Override
+		public void doRead(IntRange range, short[] data, int offset) throws IOException {
+			int current = range.start();
+			byte[] buffer = new byte[256];
+			
+			port.commandReadBin(range);
+			
+			while (current < range.post()) {
+				int pktlen = port.readProgrammerByte();
+				if (pktlen < 0)
+					throw new EOFException();
+				else if (pktlen == 0)
+					break;
+				port.read(buffer, 0, pktlen);
+				int numWords = pktlen / 2;
+				if ((numWords) > (range.post() - current))
+					numWords = range.post() - current;
+				for (int index = 0; index < numWords; ++index) {
+					data[offset + index] = (short) ((buffer[index * 2] & 0xFF) | ((buffer[index * 2 + 1] & 0xFF) << 8));
+				}
+				offset += numWords;
+				current += numWords;
+			}
+			if (current < range.post()) {
+				throw new ProgrammerException("Could not fill entire buffer");
+			}
 		}
 	}
 
