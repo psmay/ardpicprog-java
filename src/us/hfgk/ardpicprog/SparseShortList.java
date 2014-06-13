@@ -16,6 +16,10 @@ class SparseShortList {
 				minCapacity = data.length;
 			this.data = Arrays.copyOf(data, minCapacity);
 		}
+		
+		public Block(IntRange range, short... data) {
+			this(range.start(), range.size(), data);
+		}
 
 		private void resizeLeftAligned(int size) {
 			this.recentRange = null;
@@ -139,7 +143,7 @@ class SparseShortList {
 	}
 
 	void readBlock(BlockReader br, IntRange range) throws IOException {
-		Block block = new Block(range.start(), range.size());
+		Block block = new Block(range);
 		br.doRead(range, block.data, 0);
 		insertBlock(block);
 	}
