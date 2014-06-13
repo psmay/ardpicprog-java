@@ -27,16 +27,20 @@ class IntRange {
 		this._post = post;
 	}
 
-	static IntRange get(int start, int end) {
-		return new IntRange(start, end + 1);
-	}
-
-	static IntRange getNatural(int start, int post) {
+	static IntRange getPost(int start, int post) {
 		return new IntRange(start, post);
+	}
+	
+	static IntRange getEnd(int start, int end) {
+		return getPost(start, end + 1);
+	}
+	
+	static IntRange getSize(int start, int size) {
+		return getPost(start, start + size);
 	}
 
 	static IntRange empty(int start) {
-		return get(start, start - 1);
+		return getPost(start, start);
 	}
 
 	boolean containsRange(IntRange other) {

@@ -18,10 +18,12 @@ class SparseShortList {
 		}
 
 		private void resizeLeftAligned(int size) {
+			this.recentRange = null;
 			this.data = Arrays.copyOf(data, size);
 		}
 
 		private void resizeRightAligned(int size) {
+			this.recentRange = null;
 			this.data = Common.rightCopyOf(data, size);
 		}
 
@@ -34,6 +36,15 @@ class SparseShortList {
 			resizeRightAligned(data.length + 1);
 			--startIndex;
 			data[0] = word;
+		}
+		
+		private IntRange recentRange = null;
+		
+		public IntRange currentRange() {
+			if(recentRange == null) {
+				recentRange = IntRange.getSize(startIndex, data.length);
+			}
+			return recentRange;
 		}
 	}
 
@@ -65,7 +76,7 @@ class SparseShortList {
 	List<IntRange> extents() {
 		ArrayList<IntRange> result = new ArrayList<IntRange>();
 		for (Block block : blocks) {
-			result.add(IntRange.get(block.startIndex, block.startIndex + block.data.length - 1));
+			result.add(block.currentRange());
 		}
 		return result;
 	}
@@ -136,25 +147,26 @@ class SparseShortList {
 	int writeBlock(BlockWriter bw, IntRange range) throws IOException {
 		int count = 0;
 		for (Block block : blocks) {
-			IntRange brange = IntRange.get(block.startIndex, block.startIndex + block.data.length - 1);
-			if (range.containsRange(brange)) {
+			IntRange blockRange = block.currentRange();
+			if (range.containsRange(blockRange)) {
 				int offset = 0;
 
 				int overlapStart;
-				int overlapEnd;
-				if (range.start() > brange.start()) {
-					offset += (range.start() - brange.start());
+				int overlapPost;
+				
+				if (range.start() > blockRange.start()) {
+					offset += (range.start() - blockRange.start());
 					overlapStart = range.start();
 				} else {
-					overlapStart = brange.start();
+					overlapStart = blockRange.start();
 				}
-				if (range.end() < brange.end())
-					overlapEnd = range.end();
+				if (range.post() < blockRange.post())
+					overlapPost = range.post();
 				else
-					overlapEnd = brange.end();
-				IntRange overlap = IntRange.get(overlapStart, overlapEnd);
+					overlapPost = blockRange.post();
+				IntRange overlap = IntRange.getPost(overlapStart, overlapPost);
 				bw.doWrite(overlap, block.data, offset);
-				count += overlapEnd - overlapStart + 1;
+				count += overlapPost - overlapStart;
 			}
 		}
 		return count;

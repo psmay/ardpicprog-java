@@ -187,7 +187,7 @@ public class ProgrammerPort {
 
 		commandReadBin(range);
 
-		while (current <= range.end()) {
+		while (current < range.post()) {
 			int pktlen = readProgrammerByte();
 			if (pktlen < 0)
 				throw new EOFException();
@@ -203,7 +203,7 @@ public class ProgrammerPort {
 			offset += numWords;
 			current += numWords;
 		}
-		if (current <= range.end()) {
+		if (current < range.post()) {
 			throw new ProgrammerException("Could not fill entire buffer");
 		}
 	}

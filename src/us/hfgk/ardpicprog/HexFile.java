@@ -41,10 +41,10 @@ public class HexFile {
 	}
 
 	private String _deviceName;
-	private IntRange _programRange = IntRange.get(0, 0x07FF);
-	private IntRange _configRange = IntRange.get(0x2000, 0x2007);
-	private IntRange _dataRange = IntRange.get(0x2100, 0x217F);
-	private IntRange _reservedRange = IntRange.get(0x0800, 0x07FF);
+	private IntRange _programRange = IntRange.getEnd(0, 0x07FF);
+	private IntRange _configRange = IntRange.getEnd(0x2000, 0x2007);
+	private IntRange _dataRange = IntRange.getEnd(0x2100, 0x217F);
+	private IntRange _reservedRange = IntRange.getEnd(0x0800, 0x07FF);
 	private int _programBits = 14;
 	private int _dataBits = 8;
 	private int _format = FORMAT_AUTO;
@@ -69,7 +69,7 @@ public class HexFile {
 		end = Common.parseHex(value.substring(index + 1));
 		if (end == null)
 			throw new HexFileException("Invalid range '" + value + "' (end not a number)");
-		return IntRange.get(start, end);
+		return IntRange.getEnd(start, end);
 	}
 
 	public void setDeviceDetails(Map<String, String> details) throws HexFileException {
@@ -114,7 +114,7 @@ public class HexFile {
 	public boolean canForceCalibration() {
 		if (_reservedRange.isEmpty())
 			return true; // No reserved words, so force is trivially ok.
-		for (int address = _reservedRange.start(); address <= _reservedRange.end(); ++address) {
+		for (int address = _reservedRange.start(); address < _reservedRange.post(); ++address) {
 			if (!isAllOnes(address))
 				return true;
 		}
@@ -369,10 +369,10 @@ public class HexFile {
 		saveRange(file, _programRange, skipOnes);
 		if (!_configRange.isEmpty()) {
 			if ((_configRange.size()) >= 8) {
-				saveRange(file, IntRange.get(_configRange.start(), _configRange.start() + 5), skipOnes);
+				saveRange(file, IntRange.getSize(_configRange.start(), 6), skipOnes);
 				// Don't bother saving the device ID word at _configRange.start
 				// + 6.
-				saveRange(file, IntRange.get(_configRange.start() + 7, _configRange.end()), skipOnes);
+				saveRange(file, IntRange.getPost(_configRange.start() + 7, _configRange.post()), skipOnes);
 			} else {
 				saveRange(file, _configRange, skipOnes);
 			}
@@ -386,26 +386,26 @@ public class HexFile {
 	private void saveRange(OutputStream file, IntRange range, boolean skipOnes) throws IOException {
 		int current = range.start();
 		if (skipOnes) {
-			while (current <= range.end()) {
-				while (current <= range.end() && isAllOnes(current))
+			while (current < range.post()) {
+				while (current < range.post() && isAllOnes(current))
 					++current;
-				if (current > range.end())
+				if (current >= range.post())
 					break;
 				int limit = current + 1;
-				while (limit <= range.end() && !isAllOnes(limit))
+				while (limit < range.post() && !isAllOnes(limit))
 					++limit;
-				saveRange(file, IntRange.get(current, limit - 1));
+				saveRange(file, IntRange.getPost(current, limit));
 				current = limit;
 			}
 		} else {
-			saveRange(file, IntRange.get(current, range.end()));
+			saveRange(file, IntRange.getPost(current, range.post()));
 		}
 	}
 
 	private void saveRange(OutputStream file, IntRange range) throws IOException {
 		int current = range.start();
 		int currentSegment = ~0;
-		boolean needsSegments = (_programRange.end() >= 0x10000 || _configRange.end() >= 0x10000 || _dataRange.end() >= 0x10000);
+		boolean needsSegments = (rangeIsNotShort(_programRange) || rangeIsNotShort(_configRange) || rangeIsNotShort(_dataRange));
 		int format;
 		if (_format == FORMAT_AUTO && _programBits == 16)
 			format = FORMAT_IHX32;
@@ -414,7 +414,7 @@ public class HexFile {
 		if (format == FORMAT_IHX8M)
 			needsSegments = false;
 		byte[] buffer = new byte[64];
-		while (current <= range.end()) {
+		while (current < range.post()) {
 			int byteAddress = current * 2;
 			int segment = byteAddress >> 16;
 			if (needsSegments && segment != currentSegment) {
@@ -443,7 +443,7 @@ public class HexFile {
 					writeLine(file, buffer, 6);
 				}
 			}
-			if ((current + 7) <= range.end())
+			if ((current + 7) < range.post())
 				buffer[0] = (byte) 0x10;
 			else
 				buffer[0] = (byte) ((range.post() - current) * 2);
@@ -451,7 +451,7 @@ public class HexFile {
 			buffer[2] = (byte) byteAddress;
 			buffer[3] = (byte) 0x00;
 			int len = 4;
-			while (current <= range.end() && len < (4 + 16)) {
+			while (current < range.post() && len < (4 + 16)) {
 				short value = word(current);
 				buffer[len++] = (byte) value;
 				buffer[len++] = (byte) (value >> 8);
@@ -459,6 +459,10 @@ public class HexFile {
 			}
 			writeLine(file, buffer, len);
 		}
+	}
+
+	private boolean rangeIsNotShort(IntRange range) {
+		return 0x10000 < range.post();
 	}
 
 	private static void writeLine(OutputStream file, byte[] buffer, int len) throws IOException {
