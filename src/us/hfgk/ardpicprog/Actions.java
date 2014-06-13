@@ -3,7 +3,9 @@ package us.hfgk.ardpicprog;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.util.Map;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import us.hfgk.ardpicprog.HexFile.HexFileException;
@@ -17,7 +19,9 @@ public class Actions {
 	}
 
 	static void doCCOutput(String ccOutput, boolean skipOnes, HexFile hexFile) throws IOException {
-		hexFile.saveCC(ccOutput, skipOnes);
+		OutputStream file = Common.openForWrite(ccOutput);
+		hexFile.saveCC(file, skipOnes);
+		file.close();
 	}
 
 	static void doErase(boolean forceCalibration, ProgrammerPort port, HexFile hexFile) throws EraseException {
@@ -54,7 +58,27 @@ public class Actions {
 
 	static void doOutput(String output, boolean skipOnes, ProgrammerPort port, HexFile hexFile) throws IOException {
 		hexFile.read(port);
-		hexFile.save(output, skipOnes);
+
+		OutputStream file = null;
+		try {
+			try {
+				file = Common.openForWrite(output);
+			} catch (IOException e) {
+				log.severe("Could not open " + output + ": " + e.getMessage());
+				throw e;
+			}
+
+			hexFile.save(file, skipOnes);
+			file.close();
+		} finally {
+			if (file != null) {
+				try {
+					file.close();
+				} catch (IOException e) {
+					log.log(Level.SEVERE, "Could not close stream", e);
+				}
+			}
+		}
 	}
 
 	static void doBlankCheck(ProgrammerPort port, HexFile hexFile) throws IOException {

@@ -379,15 +379,7 @@ public class HexFile {
 		}
 	}
 
-	public boolean save(String filename, boolean skipOnes) throws IOException {
-		OutputStream file;
-		try {
-			file = Common.openForWrite(filename);
-		} catch (IOException e) {
-			log.severe("Could not open " + filename + ": " + e.getMessage());
-			return false;
-		}
-
+	public void save(OutputStream file, boolean skipOnes) throws IOException {
 		saveRange(file, _programRange, skipOnes);
 		if (!_configRange.isEmpty()) {
 			if ((_configRange.size()) >= 8) {
@@ -401,8 +393,6 @@ public class HexFile {
 		}
 		saveRange(file, _dataRange, skipOnes);
 		writeString(file, ":00000001FF\n");
-		file.close();
-		return true;
 	}
 
 	private void saveRange(OutputStream file, IntRange range, boolean skipOnes) throws IOException {
@@ -517,14 +507,11 @@ public class HexFile {
 		s.write(Common.getBytes(data));
 	}
 
-	public void saveCC(String filename, boolean skipOnes) throws IOException {
-		OutputStream file = Common.openForWrite(filename);
-
+	public void saveCC(OutputStream file, boolean skipOnes) throws IOException {
 		for (IntRange extent : words.extents()) {
 			saveRange(file, extent, skipOnes);
 		}
 		writeString(file, ":00000001FF\n");
-		file.close();
 	}
 
 	public void write(ProgrammerPort port, boolean forceCalibration) throws IOException {
