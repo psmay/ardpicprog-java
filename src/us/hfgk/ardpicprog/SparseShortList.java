@@ -5,7 +5,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
-class SparseShortList {
+class SparseShortList implements ShortList {
 	private static class Block {
 		private int startIndex;
 		private short[] data;
@@ -54,7 +54,8 @@ class SparseShortList {
 
 	private ArrayList<Block> blocks = new ArrayList<Block>();
 
-	void clear() {
+	@Override
+	public void clear() {
 		blocks.clear();
 	}
 
@@ -77,7 +78,8 @@ class SparseShortList {
 		return -1;
 	}
 
-	List<IntRange> extents() {
+	@Override
+	public List<IntRange> extents() {
 		ArrayList<IntRange> result = new ArrayList<IntRange>();
 		for (Block block : blocks) {
 			result.add(block.currentRange());
@@ -85,12 +87,14 @@ class SparseShortList {
 		return result;
 	}
 
-	short get(int index, short defaultValue) {
+	@Override
+	public short get(int index, short defaultValue) {
 		Block block = getContainingBlock(index);
 		return (block != null) ? block.data[index - block.startIndex] : defaultValue;
 	}
 
-	Short get(int index) {
+	@Override
+	public Short get(int index) {
 		Block block = getContainingBlock(index);
 		return (block != null) ? block.data[index - block.startIndex] : null;
 	}
@@ -104,7 +108,8 @@ class SparseShortList {
 		return null;
 	}
 
-	void set(int address, short word) {
+	@Override
+	public void set(int address, short word) {
 		int index = -1;
 
 		for (Block block : blocks) {
@@ -142,13 +147,15 @@ class SparseShortList {
 		blocks.add(new Block(address, 0, word));
 	}
 
-	void readBlock(BlockReader source, IntRange range) throws IOException {
+	@Override
+	public void readFrom(ShortSource source, IntRange range) throws IOException {
 		Block block = new Block(range);
-		source.doRead(range, block.data, 0);
+		source.readTo(range, block.data, 0);
 		insertBlock(block);
 	}
 
-	int writeBlock(BlockWriter destination, IntRange range) throws IOException {
+	@Override
+	public int writeTo(ShortSink destination, IntRange range) throws IOException {
 		int count = 0;
 		for (Block block : blocks) {
 			// Finds the intersection of a block's range and the requested
@@ -157,18 +164,10 @@ class SparseShortList {
 			IntRange blockRange = block.currentRange();
 			IntRange overlap = range.overlapWithContainedRange(blockRange);
 			if (overlap != null) {
-				destination.doWrite(overlap, block.data, overlap.start() - blockRange.start());
+				destination.writeFrom(overlap, block.data, overlap.start() - blockRange.start());
 				count += overlap.size();
 			}
 		}
 		return count;
-	}
-
-	interface BlockWriter {
-		public void doWrite(IntRange range, short[] srcArray, int offset) throws IOException;
-	}
-
-	interface BlockReader {
-		public void doRead(IntRange range, short[] destArray, int offset) throws IOException;
 	}
 }

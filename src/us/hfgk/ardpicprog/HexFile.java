@@ -58,7 +58,7 @@ public class HexFile {
 
 	private int count = 0;
 
-	private SparseShortList words = new SparseShortList();
+	private ShortList words = new SparseShortList();
 
 	private static String fetchMap(Map<String, String> details, String key, String defValue) {
 		String value = details.get(key);
@@ -144,8 +144,8 @@ public class HexFile {
 	}
 
 	public boolean blankCheckRead(ProgrammerPort port) throws IOException {
-		for(RangeAndDescription rd : getRanges()) {
-			if(!blankCheckPart(port, rd))
+		for (RangeAndDescription rd : getRanges()) {
+			if (!blankCheckPart(port, rd))
 				return false;
 		}
 		return true;
@@ -156,7 +156,7 @@ public class HexFile {
 		IntRange range = rd.range;
 		if (!range.isEmpty()) {
 			log.info("Blank checking " + areaDesc + ",");
-			if (blankCheckBlock(port, range)) {
+			if (blankCheckFrom(port.getShortSource(), range)) {
 				log.info("Looks blank");
 				return true;
 			} else {
@@ -171,8 +171,8 @@ public class HexFile {
 
 	public void read(ProgrammerPort port) throws IOException {
 		words.clear();
-		
-		for(RangeAndDescription rd : getRanges()) {
+
+		for (RangeAndDescription rd : getRanges()) {
 			readPart(port, rd);
 		}
 
@@ -184,19 +184,20 @@ public class HexFile {
 		IntRange range = rd.range;
 		if (!range.isEmpty()) {
 			log.info("Reading " + areaDesc + ",");
-			readBlock(port, range);
+			readFrom(port.getShortSource(), range);
 		} else {
 			log.info("Skipped reading " + areaDesc + ",");
 		}
 	}
 
-	private void readBlock(ProgrammerPort source, IntRange range) throws IOException {
-		words.readBlock(source.getBlockReader(), range);
+	private void readFrom(ShortSource source, IntRange range) throws IOException {
+		words.readFrom(source, range);
 	}
 
-	private boolean blankCheckBlock(ProgrammerPort source, IntRange range) throws IOException {
+	private boolean blankCheckFrom(ShortSource source, IntRange range) throws IOException {
 		final short[] buf = new short[range.size()];
-		source.getBlockReader().doRead(range, buf, 0);
+
+		source.readTo(range, buf, 0);
 
 		int i = range.start();
 		for (short word : buf) {
@@ -584,7 +585,7 @@ public class HexFile {
 	}
 
 	private void writeBlock(ProgrammerPort port, IntRange range, boolean forceCalibration) throws IOException {
-		count += words.writeBlock(port.getBlockWriter(forceCalibration), range);
+		count += words.writeTo(port.getShortSink(forceCalibration), range);
 	}
 
 	public static final class HexFileException extends IOException {

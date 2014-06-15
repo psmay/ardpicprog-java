@@ -9,9 +9,6 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.logging.Logger;
 
-import us.hfgk.ardpicprog.SparseShortList.BlockReader;
-import us.hfgk.ardpicprog.SparseShortList.BlockWriter;
-
 public class ProgrammerPort {
 	private static final Logger log = Logger.getLogger(ProgrammerPort.class.getName());
 
@@ -353,15 +350,15 @@ public class ProgrammerPort {
 		}
 	}
 	
-	BlockReader getBlockReader() {
+	ShortSource getShortSource() {
 		return new PortBlockIO(this);
 	}
 	
-	BlockWriter getBlockWriter(boolean forceCalibration) {
+	ShortSink getShortSink(boolean forceCalibration) {
 		return new PortBlockIO(this, forceCalibration);
 	}
 	
-	private static class PortBlockIO implements BlockWriter, BlockReader {
+	private static class PortBlockIO implements ShortSink, ShortSource {
 		private ProgrammerPort port;
 		private boolean forceCalibration;
 
@@ -374,7 +371,7 @@ public class ProgrammerPort {
 			this.forceCalibration = forceCalibration;
 		}
 
-		public void doWrite(IntRange range, short[] data, int offset) throws IOException {
+		public void writeFrom(IntRange range, short[] data, int offset) throws IOException {
 			ByteArrayOutputStream buffer = new ByteArrayOutputStream(ProgrammerPort.BINARY_WORD_TRANSFER_MAX * 2 + 1);
 			int wordlen = (range.size());
 			
@@ -402,7 +399,7 @@ public class ProgrammerPort {
 		}
 
 		@Override
-		public void doRead(IntRange range, short[] data, int offset) throws IOException {
+		public void readTo(IntRange range, short[] data, int offset) throws IOException {
 			int current = range.start();
 			byte[] buffer = new byte[256];
 			
