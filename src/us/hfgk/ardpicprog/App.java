@@ -315,7 +315,8 @@ public class App {
 			Map<String, String> details = port.initDevice(options.device);
 
 			// Copy the device details into the hex file object.
-			HexFile hexFile = Actions.getHexFile(options.format, details);
+			// Get the input file data if specified.
+			HexFile hexFile = Actions.getHexFile(options.format, details, options.input);
 
 			// Dump the type of device and how much memory it has.
 			if (options.describeDevice) {
@@ -324,11 +325,6 @@ public class App {
 
 			if (options.blankCheck) {
 				Actions.doBlankCheck(port, hexFile);
-			}
-
-			// Read the input file.
-			if (!Common.stringEmpty(options.input)) {
-				Actions.doInput(options.input, hexFile);
 			}
 
 			// Copy the input to the CC output file.

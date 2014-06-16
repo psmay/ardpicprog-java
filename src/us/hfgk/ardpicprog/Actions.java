@@ -1,6 +1,5 @@
 package us.hfgk.ardpicprog;
 
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -8,7 +7,6 @@ import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import us.hfgk.ardpicprog.HexFile.HexFileException;
 import us.hfgk.ardpicprog.ProgrammerPort.EraseException;
 
 public class Actions {
@@ -44,12 +42,6 @@ public class Actions {
 				throw new EraseException("Erase command failed", e);
 			}
 		}
-	}
-
-	static void doInput(String input, HexFile hexFile) throws FileNotFoundException, IOException {
-		InputStream file = Common.openForRead(input);
-		hexFile.load(file);
-		file.close();
 	}
 
 	static void doListDevices(ProgrammerPort port) throws IOException {
@@ -103,10 +95,17 @@ public class Actions {
 				+ " words, data memory: " + hexFile.dataSizeBytes() + " bytes.");
 	}
 
-	static HexFile getHexFile(int format, Map<String, String> details) throws HexFileException {
-		HexFile hexFile = new HexFile();
-		hexFile.setDeviceDetails(details);
-		hexFile.setFormat(format);
+	static HexFile getHexFile(int format, Map<String, String> details, String input) throws IOException {
+		HexFile hexFile;
+		if(!Common.stringEmpty(input)) {
+			InputStream file;
+			file = Common.openForRead(input);
+			hexFile = HexFileParser.load(details, format, file);
+			file.close();			
+		}
+		else {
+			hexFile = new HexFile(details, format);
+		}
 		return hexFile;
 	}
 
