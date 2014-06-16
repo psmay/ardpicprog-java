@@ -1,9 +1,9 @@
 package us.hfgk.ardpicprog;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.util.ArrayList;
 import java.util.Map;
 import java.util.logging.Logger;
 
@@ -26,7 +26,7 @@ public class HexFile {
 	public static final int FORMAT_IHX8M = 0;
 	public static final int FORMAT_IHX16 = 1;
 	public static final int FORMAT_IHX32 = 2;
-
+	
 	public String deviceName() {
 		return _deviceName;
 	}
@@ -227,18 +227,18 @@ public class HexFile {
 	}
 
 	// Read a big-endian word value from a buffer.
-	private static short readBigWord(ArrayList<Byte> bytes, int index) {
-		return shortFromBytes(bytes.get(index), bytes.get(index + 1));
+	private static short readBigWord(byte[] bytes, int index) {
+		return shortFromBytes(bytes[index], bytes[index + 1]);
 	}
 
 	// Read a little-endian word value from a buffer.
-	private static short readLittleWord(ArrayList<Byte> bytes, int index) {
-		return shortFromBytes(bytes.get(index + 1), bytes.get(index));
+	private static short readLittleWord(byte[] bytes, int index) {
+		return shortFromBytes(bytes[index + 1], bytes[index]);
 	}
 
 	public void load(InputStream file) throws IOException {
 		boolean startLine = true;
-		ArrayList<Byte> line = new ArrayList<Byte>();
+		ByteArrayOutputStream line = new ByteArrayOutputStream();
 		int ch, digit;
 		int nibble = -1;
 
@@ -256,15 +256,16 @@ public class HexFile {
 				}
 
 				if (!startLine) {
-					validateSize(line);
-					validateChecksum(line);
+					byte[] bytes = line.toByteArray();
+					validateSize(bytes);
+					validateChecksum(bytes);
 
-					baseAddress = readRecord(line, baseAddress);
+					baseAddress = readRecord(bytes, baseAddress);
 					if (baseAddress == READ_RECORD_OK) {
 						return; // ok
 					}
 				}
-				line.clear();
+				line.reset();
 				startLine = true;
 				continue;
 			}
@@ -291,7 +292,7 @@ public class HexFile {
 				if (nibble == -1) {
 					nibble = digit;
 				} else {
-					line.add(((byte) ((nibble << 4) | digit)));
+					line.write((byte) ((nibble << 4) | digit));
 					nibble = -1;
 				}
 			}
@@ -301,19 +302,19 @@ public class HexFile {
 
 	}
 
-	private void validateSize(ArrayList<Byte> line) throws HexFileException {
-		if (line.size() < 5) {
+	private void validateSize(byte[] line) throws HexFileException {
+		if (line.length < 5) {
 			// Not enough bytes to form a valid line.
 			throw new HexFileException("Line too short");
 		}
 
-		if ((line.get(0) & 0xFF) != line.size() - 5) {
+		if ((line[0] & 0xFF) != line.length - 5) {
 			// Size value is incorrect.
 			throw new HexFileException("Line size is not correct");
 		}
 	}
 
-	private void validateChecksum(ArrayList<Byte> line) throws HexFileException {
+	private void validateChecksum(byte[] line) throws HexFileException {
 		int checksum;
 		checksum = 0;
 
@@ -326,16 +327,16 @@ public class HexFile {
 
 		checksum = (((checksum & 0xFF) ^ 0xFF) + 1) & 0xFF;
 
-		if (checksum != (line.get(line.size() - 1) & 0xFF)) {
+		if (checksum != (line[line.length - 1] & 0xFF)) {
 			// Checksum for this line is incorrect.
 			throw new HexFileException("Line checksum is not correct");
 		}
 	}
 
-	private int readRecord(ArrayList<Byte> line, int baseAddress) throws HexFileException {
+	private int readRecord(byte[] line, int baseAddress) throws HexFileException {
 
-		byte byte3 = line.get(3);
-		byte byte0 = line.get(0);
+		byte byte3 = line[3];
+		byte byte0 = line[0];
 
 		switch (byte3) {
 		case RECORD_DATA:
@@ -379,8 +380,8 @@ public class HexFile {
 		}
 	}
 
-	private void copyLineToWords(ArrayList<Byte> line, int wordAddress) {
-		int lineSizeMinus5 = line.size() - 5;
+	private void copyLineToWords(byte[] line, int wordAddress) {
+		int lineSizeMinus5 = line.length - 5;
 		for (int wordIndex = 0; (wordIndex << 1) < lineSizeMinus5; ++wordIndex) {
 			words.set(wordAddress + wordIndex, readLittleWord(line, (wordIndex << 1) + 4));
 		}
