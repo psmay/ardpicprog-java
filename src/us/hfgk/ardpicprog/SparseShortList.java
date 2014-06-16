@@ -162,8 +162,8 @@ class SparseShortList implements ShortList {
 			// range. If there is overlap, the applicable part of the blocks
 			// data is copied.
 			IntRange blockRange = block.currentRange();
-			IntRange overlap = range.overlapWithContainedRange(blockRange);
-			if (overlap != null) {
+			IntRange overlap = range.intersection(blockRange);
+			if (!overlap.isEmpty()) {
 				destination.writeFrom(overlap, block.data, overlap.start() - blockRange.start());
 				count += overlap.size();
 			}
