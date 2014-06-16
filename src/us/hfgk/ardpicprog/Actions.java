@@ -15,7 +15,7 @@ public class Actions {
 	private static final Logger log = Logger.getLogger(Actions.class.getName());
 
 	static void doBurn(boolean forceCalibration, ProgrammerPort port, HexFile hexFile) throws IOException {
-		hexFile.write(port, forceCalibration);
+		hexFile.writeTo(port, forceCalibration);
 	}
 
 	static void doCCOutput(String ccOutput, boolean skipOnes, HexFile hexFile) throws IOException {
@@ -57,7 +57,7 @@ public class Actions {
 	}
 
 	static void doOutput(String output, boolean skipOnes, ProgrammerPort port, HexFile hexFile) throws IOException {
-		hexFile.read(port);
+		hexFile.readFrom(port);
 
 		OutputStream file = null;
 		try {
