@@ -11,8 +11,12 @@ import java.util.logging.Logger;
 public class HexFile {
 	private static final Logger log = Logger.getLogger(HexFile.class.getName());
 
+	private final int format;
+	private DeviceDetails device;
+	private ShortList words;
+
 	public HexFile(Map<String, String> details, int format, ShortList words) throws HexFileException {
-		this._format = validateFormat(format);
+		this.format = validateFormat(format);
 		if (details == null) {
 			details = Collections.<String, String> emptyMap();
 		}
@@ -46,31 +50,21 @@ public class HexFile {
 		}
 	}
 
-	public String deviceName() {
-		return device.deviceName;
-	}
-
-	private int dataBits() {
-		return device.dataBits;
-	}
-
 	int programSizeWords() {
 		return device.programRange.size();
 	}
 
 	public int dataSizeBytes() {
-		return device.dataRange.size() * dataBits() / 8;
+		return device.dataRange.size() * getDevice().dataBits / 8;
 	}
 
-	int _format = FORMAT_AUTO;
-
-	private DeviceDetails device;
+	public int getFormat() {
+		return format;
+	}
 
 	public DeviceDetails getDevice() {
 		return device;
 	}
-
-	private ShortList words;
 
 	public List<IntRange> extents() {
 		return words.extents();
@@ -96,11 +90,13 @@ public class HexFile {
 	public boolean canForceCalibration() {
 		if (device.reservedRange.isEmpty())
 			return true; // No reserved words, so force is trivially ok.
+
 		int post = device.reservedRange.post();
 		for (int address = device.reservedRange.start(); address < post; ++address) {
 			if (!isAllOnes(address))
 				return true;
 		}
+
 		return false;
 	}
 
@@ -114,20 +110,20 @@ public class HexFile {
 		return Collections.unmodifiableList(ls);
 	}
 
-	public boolean blankCheckRead(ProgrammerPort port) throws IOException {
-		for (Tuple2<String, IntRange> rd : getAreas()) {
-			if (!blankCheckArea(port, rd))
+	public boolean blankCheckRead(ShortSource source) throws IOException {
+		for (Tuple2<String, IntRange> area : getAreas()) {
+			if (!blankCheckArea(source, area))
 				return false;
 		}
 		return true;
 	}
 
-	private boolean blankCheckArea(ProgrammerPort port, Tuple2<String, IntRange> rd) throws IOException {
-		String areaDesc = rd._1;
-		IntRange range = rd._2;
+	private boolean blankCheckArea(ShortSource shortSource, Tuple2<String, IntRange> area) throws IOException {
+		String areaDesc = area._1;
+		IntRange range = area._2;
 		if (!range.isEmpty()) {
 			log.info("Blank checking " + areaDesc + ",");
-			if (blankCheckFrom(port.getShortSource(), range)) {
+			if (blankCheckFrom(shortSource, range)) {
 				log.info("Looks blank");
 				return true;
 			} else {
@@ -140,29 +136,25 @@ public class HexFile {
 		}
 	}
 
-	public void readFrom(ProgrammerPort port) throws IOException {
+	public void readFrom(ShortSource source) throws IOException {
 		words.clear();
 
 		for (Tuple2<String, IntRange> rd : getAreas()) {
-			readAreaFrom(port, rd);
+			readAreaFrom(source, rd);
 		}
 
 		log.info("done.");
 	}
 
-	private void readAreaFrom(ProgrammerPort port, Tuple2<String, IntRange> rd) throws IOException {
-		String areaDesc = rd._1;
-		IntRange range = rd._2;
+	private void readAreaFrom(ShortSource source, Tuple2<String, IntRange> area) throws IOException {
+		String areaDesc = area._1;
+		IntRange range = area._2;
 		if (!range.isEmpty()) {
 			log.info("Reading " + areaDesc + ",");
-			readFrom(port.getShortSource(), range);
+			words.readFrom(source, range);
 		} else {
 			log.info("Skipped reading " + areaDesc + ",");
 		}
-	}
-
-	private void readFrom(ShortSource source, IntRange range) throws IOException {
-		words.readFrom(source, range);
 	}
 
 	private boolean blankCheckFrom(ShortSource source, IntRange range) throws IOException {
@@ -194,39 +186,41 @@ public class HexFile {
 	}
 
 	public void writeTo(ProgrammerPort port, boolean forceCalibration) throws IOException {
+		writeTo(port.getShortSink(forceCalibration), forceCalibration);
+	}
 
+	public void writeTo(ShortSink sink, boolean forceCalibration) throws IOException {
 		// If the test is true, calibration forced or no reserved words to worry
 		// about.
 		// Else, assumes: reserved words are always at the end of program
 		// memory.
 		IntRange programRangeForWrite = (forceCalibration || device.reservedRange.isEmpty()) ? device.programRange
-				: IntRange.empty(device.programRange.start());
+				: programStartToReservedStart();
 
 		// Write the contents of program memory.
-		writeArea(port, forceCalibration, "program memory", programRangeForWrite, device.programRange.isEmpty());
+		writeArea(sink, "program memory", programRangeForWrite, device.programRange.isEmpty());
 
 		// Write data memory before config memory in case the configuration
 		// word turns on data protection and thus hinders data verification.
-		writeArea(port, forceCalibration, "data memory", device.dataRange, device.dataRange.isEmpty());
+		writeArea(sink, "data memory", device.dataRange, device.dataRange.isEmpty());
 
 		// Write the contents of config memory.
-		writeArea(port, forceCalibration, "id words and fuses", device.configRange, device.configRange.isEmpty());
+		writeArea(sink, "id words and fuses", device.configRange, device.configRange.isEmpty());
 
 		log.info("done.");
 	}
 
-	private void writeArea(ProgrammerPort port, boolean forceCalibration, String desc, IntRange range, boolean skip)
-			throws IOException {
+	private IntRange programStartToReservedStart() {
+		return IntRange.getPost(device.programRange.start(), device.reservedRange.start());
+	}
+
+	private void writeArea(ShortSink sink, String desc, IntRange range, boolean skip) throws IOException {
 		if (skip)
 			log.info("Skipped burning " + desc + ",");
 		else {
 			log.info("Burning " + desc + ",");
-			reportCount(writeBlockTo(port, range, forceCalibration));
+			reportCount(words.writeTo(sink, range));
 		}
-	}
-
-	private int writeBlockTo(ProgrammerPort port, IntRange range, boolean forceCalibration) throws IOException {
-		return words.writeTo(port.getShortSink(forceCalibration), range);
 	}
 
 	public static final class HexFileException extends IOException {

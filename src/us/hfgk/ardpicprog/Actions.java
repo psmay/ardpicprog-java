@@ -49,7 +49,7 @@ public class Actions {
 	}
 
 	static void doOutput(String output, boolean skipOnes, ProgrammerPort port, HexFile hexFile) throws IOException {
-		hexFile.readFrom(port);
+		hexFile.readFrom(port.getShortSource());
 
 		OutputStream file = null;
 		try {
@@ -75,7 +75,7 @@ public class Actions {
 
 	static void doBlankCheck(ProgrammerPort port, HexFile hexFile) throws IOException {
 		log.info("Checking whether device is blank");
-		if (hexFile.blankCheckRead(port)) {
+		if (hexFile.blankCheckRead(port.getShortSource())) {
 			log.info("Device appears to be blank");
 		} else {
 			log.info("Device appears to be NOT blank");
@@ -91,7 +91,7 @@ public class Actions {
 	}
 
 	static void describeHexFileDevice(HexFile hexFile) {
-		log.info("Device " + hexFile.deviceName() + ", program memory: " + hexFile.programSizeWords()
+		log.info("Device " + hexFile.getDevice().deviceName + ", program memory: " + hexFile.programSizeWords()
 				+ " words, data memory: " + hexFile.dataSizeBytes() + " bytes.");
 	}
 

@@ -17,7 +17,7 @@ class HexFileSerializer {
 	private static int determineOutputExtendedAddress(HexFile hex, OutputStream file, int currentSegment,
 			boolean needsSegments, byte[] buffer, int segment) throws IOException {
 		if (needsSegments && segment != currentSegment) {
-			if (segment < 16 && hex._format != HexFile.FORMAT_IHX32) {
+			if (segment < 16 && hex.getFormat() != HexFile.FORMAT_IHX32) {
 				// Over 64K boundary: output an Extended Segment Address
 				// Record.
 				currentSegment = outputExtendedAddress(hex, file, buffer, segment, (byte) 0x02, 12);
@@ -86,7 +86,7 @@ class HexFileSerializer {
 		int currentSegment = ~0;
 		DeviceDetails device = hex.getDevice();
 		boolean needsSegments = (rangeIsNotShort(device.programRange) || rangeIsNotShort(device.configRange) || rangeIsNotShort(device.dataRange));
-		int formatz = hex._format;
+		int formatz = hex.getFormat();
 		int format = (formatz == HexFile.FORMAT_AUTO && device.programBits == 16) ? HexFile.FORMAT_IHX32 : formatz;
 		if (format == HexFile.FORMAT_IHX8M)
 			needsSegments = false;
