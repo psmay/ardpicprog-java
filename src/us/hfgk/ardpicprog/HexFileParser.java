@@ -5,8 +5,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.Map;
 
-import us.hfgk.ardpicprog.HexFile.HexFileException;
-
 class HexFileParser {
 	// Record types
 	private static final int RECORD_DATA = 0x00;

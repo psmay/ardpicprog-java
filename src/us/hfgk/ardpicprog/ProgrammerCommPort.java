@@ -4,7 +4,6 @@ import java.io.Closeable;
 import java.io.IOException;
 
 import us.hfgk.ardpicprog.ProgrammerPort.CommBuffer;
-import us.hfgk.ardpicprog.ProgrammerPort.PortSetupException;
 
 public interface ProgrammerCommPort extends Closeable {
 	@Override

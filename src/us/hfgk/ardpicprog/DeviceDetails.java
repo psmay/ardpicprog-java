@@ -2,8 +2,6 @@ package us.hfgk.ardpicprog;
 
 import java.util.Map;
 
-import us.hfgk.ardpicprog.HexFile.HexFileException;
-
 class DeviceDetails {
 	final String deviceName;
 	final IntRange programRange;

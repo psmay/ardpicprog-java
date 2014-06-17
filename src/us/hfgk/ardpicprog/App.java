@@ -9,10 +9,6 @@ import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import us.hfgk.ardpicprog.HexFile.HexFileException;
-import us.hfgk.ardpicprog.ProgrammerPort.DeviceException;
-import us.hfgk.ardpicprog.ProgrammerPort.ProgrammerException;
-
 public class App {
 
 	private static final Logger log = Logger.getLogger(App.class.getName());
@@ -361,14 +357,6 @@ public class App {
 				}
 			}
 			log.info("Done");
-		}
-	}
-
-	private static class UsageException extends Exception {
-		private static final long serialVersionUID = 1L;
-
-		public UsageException(String arg0) {
-			super(arg0);
 		}
 	}
 }

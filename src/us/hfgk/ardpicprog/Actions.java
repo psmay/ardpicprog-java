@@ -7,8 +7,6 @@ import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import us.hfgk.ardpicprog.ProgrammerPort.EraseException;
-
 public class Actions {
 	private static final Logger log = Logger.getLogger(Actions.class.getName());
 

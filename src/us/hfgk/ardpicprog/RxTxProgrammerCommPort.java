@@ -11,7 +11,6 @@ import java.io.InputStream;
 import java.io.OutputStream;
 
 import us.hfgk.ardpicprog.ProgrammerPort.CommBuffer;
-import us.hfgk.ardpicprog.ProgrammerPort.PortSetupException;
 
 public class RxTxProgrammerCommPort implements ProgrammerCommPort {
 	private SerialPort serialPort = null;
