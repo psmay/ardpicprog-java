@@ -3,7 +3,6 @@ package us.hfgk.ardpicprog;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.Map;
 
 class HexFileParser {
 	// Record types
@@ -41,12 +40,13 @@ class HexFileParser {
 		}
 	}
 
-	public static HexFile load(Map<String,String> details, int format, InputStream file) throws IOException {
-		ShortList words = new SparseShortList();		
+	public static HexFile load(HexFileMetadata details, InputStream file) throws IOException {
+		if(details == null)
+			throw new IllegalArgumentException();
+		SparseShortList words = new SparseShortList();
 		loadIntoShortList(words, file);
-		return new HexFile(details, format, words);
+		return new HexFile(details, words);
 	}
-
 
 	private static void loadIntoShortList(ShortList words, InputStream file) throws IOException, HexFileException {
 		boolean startLine = true;

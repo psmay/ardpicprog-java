@@ -1,8 +1,9 @@
 package us.hfgk.ardpicprog;
 
+import java.util.Collections;
 import java.util.Map;
 
-class DeviceDetails {
+final class DeviceDetails {
 	final String deviceName;
 	final IntRange programRange;
 	final IntRange configRange;
@@ -11,7 +12,14 @@ class DeviceDetails {
 	final int programBits;
 	final int dataBits;
 
+	DeviceDetails() throws HexFileException {
+		this(null);
+	}
+	
 	DeviceDetails(Map<String, String> details) throws HexFileException {
+		if(details == null) {
+			details = Collections.emptyMap();
+		}
 		deviceName = ensureDefined(details.get("DeviceName"));
 		programRange = parseRangeUnlessEmpty(details.get("ProgramRange"), 0x0001);
 		programBits = Common.parseInt(DeviceDetails.fetchMap(details, "ProgramBits", "14"), 0);

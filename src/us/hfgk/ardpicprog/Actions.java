@@ -4,7 +4,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.Map;
-import java.util.logging.Level;
 import java.util.logging.Logger;
 
 public class Actions {
@@ -46,8 +45,10 @@ public class Actions {
 		log.info("Supported devices:\n" + port.devices() + "* = autodetected");
 	}
 
-	static void doOutput(String output, boolean skipOnes, ProgrammerPort port, HexFile hexFile) throws IOException {
-		hexFile.readFrom(port.getShortSource());
+	static void doOutput(String output, boolean skipOnes, ProgrammerPort port, HexFileMetadata hexMeta) throws IOException {
+		SparseShortList words = new SparseShortList();		
+		HexFile.readFrom(words, port.getShortSource(), hexMeta.getAreas());		
+		HexFile hexFile = new HexFile(hexMeta, words);
 
 		OutputStream file = null;
 		try {
@@ -61,19 +62,13 @@ public class Actions {
 			hexFile.save(file, skipOnes);
 			file.close();
 		} finally {
-			if (file != null) {
-				try {
-					file.close();
-				} catch (IOException e) {
-					log.log(Level.SEVERE, "Could not close stream", e);
-				}
-			}
+			Common.closeWarnOnError(file, log);
 		}
 	}
 
-	static void doBlankCheck(ProgrammerPort port, HexFile hexFile) throws IOException {
+	static void doBlankCheck(ProgrammerPort port, HexFileMetadata metadata) throws IOException {
 		log.info("Checking whether device is blank");
-		if (hexFile.blankCheckRead(port.getShortSource())) {
+		if (HexFile.blankCheckRead(metadata, port.getShortSource())) {
 			log.info("Device appears to be blank");
 		} else {
 			log.info("Device appears to be NOT blank");
@@ -88,23 +83,26 @@ public class Actions {
 		return pp;
 	}
 
-	static void describeHexFileDevice(HexFile hexFile) {
-		log.info("Device " + hexFile.getDevice().deviceName + ", program memory: " + hexFile.programSizeWords()
-				+ " words, data memory: " + hexFile.dataSizeBytes() + " bytes.");
+	static void describeHexFileDevice(HexFileMetadata metadata) {
+		log.info("Device " + metadata.getDevice().deviceName + ", program memory: " + metadata.programSizeWords()
+				+ " words, data memory: " + metadata.dataSizeBytes() + " bytes.");
+	}
+	
+	static HexFileMetadata getHexMeta(int format, Map<String, String> details) throws IOException {
+		return new HexFileMetadata(new DeviceDetails(details), format);
+	}
+	
+	static HexFile loadHexFile(HexFileMetadata metadata, String input) throws IOException {
+		InputStream file = null;		
+		try {
+			file = Common.openForRead(input);
+			return HexFileParser.load(metadata, file);
+		}
+		finally {
+			Common.closeWarnOnError(file, log);
+		}
 	}
 
-	static HexFile getHexFile(int format, Map<String, String> details, String input) throws IOException {
-		HexFile hexFile;
-		if(!Common.stringEmpty(input)) {
-			InputStream file;
-			file = Common.openForRead(input);
-			hexFile = HexFileParser.load(details, format, file);
-			file.close();			
-		}
-		else {
-			hexFile = new HexFile(details, format);
-		}
-		return hexFile;
-	}
+
 
 }

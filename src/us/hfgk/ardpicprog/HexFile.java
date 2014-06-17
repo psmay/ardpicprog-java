@@ -2,8 +2,6 @@ package us.hfgk.ardpicprog;
 
 import java.io.IOException;
 import java.io.OutputStream;
-import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.logging.Logger;
@@ -11,21 +9,27 @@ import java.util.logging.Logger;
 public class HexFile {
 	private static final Logger log = Logger.getLogger(HexFile.class.getName());
 
-	private final int format;
-	private DeviceDetails device;
-	private ShortList words;
+	private final HexFileMetadata metadata;
 
-	public HexFile(Map<String, String> details, int format, ShortList words) throws HexFileException {
-		this.format = validateFormat(format);
-		if (details == null) {
-			details = Collections.<String, String> emptyMap();
-		}
-		this.device = new DeviceDetails(details);
+	private ReadableShortList words;
 
-		if (words == null) {
+	public HexFile(Map<String, String> details, int format, ReadableShortList words) throws HexFileException {
+		this(new DeviceDetails(details), format, words);
+	}
+
+	public HexFile(HexFileMetadata metadata, ReadableShortList words) throws HexFileException {
+		if(metadata == null)
+			throw new IllegalArgumentException();
+		
+		if(words == null)
 			words = new SparseShortList();
-		}
+		
+		this.metadata = metadata;
 		this.words = words;
+	}
+	
+	public HexFile(DeviceDetails device, int format, ReadableShortList words) throws HexFileException {
+		this(new HexFileMetadata(device, format), words);
 	}
 
 	public HexFile(Map<String, String> details, int format) throws HexFileException {
@@ -38,49 +42,20 @@ public class HexFile {
 	public static final int FORMAT_IHX16 = 1;
 	public static final int FORMAT_IHX32 = 2;
 
-	private static int validateFormat(int format) throws HexFileException {
-		switch (format) {
-		case FORMAT_AUTO:
-		case FORMAT_IHX8M:
-		case FORMAT_IHX16:
-		case FORMAT_IHX32:
-			return format;
-		default:
-			throw new HexFileException("Unknown format");
-		}
-	}
-
-	int programSizeWords() {
-		return device.programRange.size();
-	}
-
-	public int dataSizeBytes() {
-		return device.dataRange.size() * getDevice().dataBits / 8;
-	}
-
-	public int getFormat() {
-		return format;
-	}
-
-	public DeviceDetails getDevice() {
-		return device;
-	}
-
 	public List<IntRange> extents() {
 		return words.extents();
 	}
 
 	public short word(int address) {
-		return words.get(address, fullWord(address));
-	}
-
-	private short fullWord(int address) {
-		int numberOfBits = device.dataRange.containsValue(address) ? device.dataBits : device.programBits;
-		return (short) ((1 << numberOfBits) - 1);
+		return words.get(address, metadata.fullWordAtAddress(address));
 	}
 
 	private boolean wouldBeAllOnes(int address, short wordValue) {
-		return wordValue == fullWord(address);
+		return wouldBeAllOnes(metadata, address, wordValue);
+	}
+
+	private static boolean wouldBeAllOnes(HexFileMetadata metadata, int address, short wordValue) {
+		return wordValue == metadata.fullWordAtAddress(address);
 	}
 
 	public boolean isAllOnes(int address) {
@@ -88,11 +63,11 @@ public class HexFile {
 	}
 
 	public boolean canForceCalibration() {
-		if (device.reservedRange.isEmpty())
+		if (getMetadata().getDevice().reservedRange.isEmpty())
 			return true; // No reserved words, so force is trivially ok.
 
-		int post = device.reservedRange.post();
-		for (int address = device.reservedRange.start(); address < post; ++address) {
+		int post = getMetadata().getDevice().reservedRange.post();
+		for (int address = getMetadata().getDevice().reservedRange.start(); address < post; ++address) {
 			if (!isAllOnes(address))
 				return true;
 		}
@@ -100,30 +75,21 @@ public class HexFile {
 		return false;
 	}
 
-	private List<Tuple2<String, IntRange>> getAreas() {
-		List<Tuple2<String, IntRange>> ls = new ArrayList<Tuple2<String, IntRange>>();
-
-		ls.add(new Tuple2<String, IntRange>("program memory", device.programRange));
-		ls.add(new Tuple2<String, IntRange>("data memory", device.dataRange));
-		ls.add(new Tuple2<String, IntRange>("id words and fuses", device.configRange));
-
-		return Collections.unmodifiableList(ls);
-	}
-
-	public boolean blankCheckRead(ShortSource source) throws IOException {
-		for (Tuple2<String, IntRange> area : getAreas()) {
-			if (!blankCheckArea(source, area))
+	public static boolean blankCheckRead(HexFileMetadata metadata, ShortSource source) throws IOException {
+		for (Tuple2<String, IntRange> area : metadata.getAreas()) {			
+			if (!blankCheckArea(metadata, source, area))
 				return false;
 		}
 		return true;
 	}
 
-	private boolean blankCheckArea(ShortSource shortSource, Tuple2<String, IntRange> area) throws IOException {
+	private static boolean blankCheckArea(HexFileMetadata metadata, ShortSource shortSource, Tuple2<String, IntRange> area)
+			throws IOException {
 		String areaDesc = area._1;
 		IntRange range = area._2;
 		if (!range.isEmpty()) {
-			log.info("Blank checking " + areaDesc + ",");
-			if (blankCheckFrom(shortSource, range)) {
+			log.info("Blank checking " + areaDesc + ",");			
+			if (blankCheckFrom(metadata, shortSource, range)) {
 				log.info("Looks blank");
 				return true;
 			} else {
@@ -136,17 +102,20 @@ public class HexFile {
 		}
 	}
 
-	public void readFrom(ShortSource source) throws IOException {
+	public static void readFrom(ShortList words, ShortSource source, List<Tuple2<String, IntRange>> areas)
+			throws IOException {
 		words.clear();
+		// List<Tuple2<String, IntRange>> areas = getAreas();
 
-		for (Tuple2<String, IntRange> rd : getAreas()) {
-			readAreaFrom(source, rd);
+		for (Tuple2<String, IntRange> rd : areas) {
+			readAreaFrom(words, source, rd);
 		}
 
 		log.info("done.");
 	}
 
-	private void readAreaFrom(ShortSource source, Tuple2<String, IntRange> area) throws IOException {
+	private static void readAreaFrom(ShortList words, ShortSource source, Tuple2<String, IntRange> area)
+			throws IOException {
 		String areaDesc = area._1;
 		IntRange range = area._2;
 		if (!range.isEmpty()) {
@@ -157,14 +126,14 @@ public class HexFile {
 		}
 	}
 
-	private boolean blankCheckFrom(ShortSource source, IntRange range) throws IOException {
+	private static boolean blankCheckFrom(HexFileMetadata metadata, ShortSource source, IntRange range) throws IOException {
 		final short[] buf = new short[range.size()];
 
 		source.readTo(range, buf, 0);
 
 		int i = range.start();
-		for (short word : buf) {
-			if (!wouldBeAllOnes(i, word)) {
+		for (short word : buf) {			
+			if (!wouldBeAllOnes(metadata, i, word)) {
 				return false;
 			}
 			++i;
@@ -194,24 +163,24 @@ public class HexFile {
 		// about.
 		// Else, assumes: reserved words are always at the end of program
 		// memory.
-		IntRange programRangeForWrite = (forceCalibration || device.reservedRange.isEmpty()) ? device.programRange
+		IntRange programRangeForWrite = (forceCalibration || getMetadata().getDevice().reservedRange.isEmpty()) ? getMetadata().getDevice().programRange
 				: programStartToReservedStart();
 
 		// Write the contents of program memory.
-		writeArea(sink, "program memory", programRangeForWrite, device.programRange.isEmpty());
+		writeArea(sink, "program memory", programRangeForWrite, getMetadata().getDevice().programRange.isEmpty());
 
 		// Write data memory before config memory in case the configuration
 		// word turns on data protection and thus hinders data verification.
-		writeArea(sink, "data memory", device.dataRange, device.dataRange.isEmpty());
+		writeArea(sink, "data memory", getMetadata().getDevice().dataRange, getMetadata().getDevice().dataRange.isEmpty());
 
 		// Write the contents of config memory.
-		writeArea(sink, "id words and fuses", device.configRange, device.configRange.isEmpty());
+		writeArea(sink, "id words and fuses", getMetadata().getDevice().configRange, getMetadata().getDevice().configRange.isEmpty());
 
 		log.info("done.");
 	}
 
 	private IntRange programStartToReservedStart() {
-		return IntRange.getPost(device.programRange.start(), device.reservedRange.start());
+		return IntRange.getPost(getMetadata().getDevice().programRange.start(), getMetadata().getDevice().reservedRange.start());
 	}
 
 	private void writeArea(ShortSink sink, String desc, IntRange range, boolean skip) throws IOException {
@@ -221,6 +190,10 @@ public class HexFile {
 			log.info("Burning " + desc + ",");
 			reportCount(words.writeTo(sink, range));
 		}
+	}
+
+	HexFileMetadata getMetadata() {
+		return metadata;
 	}
 
 }

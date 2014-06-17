@@ -312,49 +312,51 @@ public class App {
 
 			// Copy the device details into the hex file object.
 			// Get the input file data if specified.
-			HexFile hexFile = Actions.getHexFile(options.format, details, options.input);
+			//HexFile hexFile = Actions.getHexFile(options.format, details, options.input);
+			HexFileMetadata hexMeta = Actions.getHexMeta(options.format, details);
 
 			// Dump the type of device and how much memory it has.
 			if (options.describeDevice) {
-				Actions.describeHexFileDevice(hexFile);
+				Actions.describeHexFileDevice(hexMeta);
 			}
 
 			if (options.blankCheck) {
-				Actions.doBlankCheck(port, hexFile);
+				Actions.doBlankCheck(port, hexMeta);
 			}
 
-			// Copy the input to the CC output file.
-			if (!Common.stringEmpty(options.ccOutput)) {
-				Actions.doCCOutput(options.ccOutput, options.skipOnes, hexFile);
+			// If there is input to be had, now is the time.
+			if(!Common.stringEmpty(options.input)) {
+				HexFile hexFile = Actions.loadHexFile(hexMeta, options.input);
+				
+				// Copy the input to the CC output file.
+				if (!Common.stringEmpty(options.ccOutput)) {
+					Actions.doCCOutput(options.ccOutput, options.skipOnes, hexFile);
+				}
+				
+				// Erase the device if necessary. If --force-calibration is
+				// specified
+				// and we have an input that includes calibration information, then
+				// use
+				// the "NOPRESERVE" option when erasing.
+				if (options.erase) {
+					Actions.doErase(options.forceCalibration, port, hexFile);
+				}
+				
+				// Burn the input file into the device if requested.
+				if (options.burn) {
+					Actions.doBurn(options.forceCalibration, port, hexFile);
+				}
 			}
-
-			// Erase the device if necessary. If --force-calibration is
-			// specified
-			// and we have an input that includes calibration information, then
-			// use
-			// the "NOPRESERVE" option when erasing.
-			if (options.erase) {
-				Actions.doErase(options.forceCalibration, port, hexFile);
-			}
-
-			// Burn the input file into the device if requested.
-			if (options.burn) {
-				Actions.doBurn(options.forceCalibration, port, hexFile);
-			}
-
+			 
 			// If we have an output file, then read the contents of the PIC into
 			// it.
 			if (!Common.stringEmpty(options.output)) {
-				Actions.doOutput(options.output, options.skipOnes, port, hexFile);
+				Actions.doOutput(options.output, options.skipOnes, port, hexMeta);
 			}
 		} finally {
 			if (port != null) {
 				log.info("Closing programmer...");
-				try {
-					port.close();
-				} catch (IOException e) {
-					log.warning("Problem while closing programmer port: " + e.getMessage());
-				}
+				Common.closeWarnOnError(port, log, "Problem while closing programmer port");
 			}
 			log.info("Done");
 		}

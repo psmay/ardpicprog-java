@@ -2,15 +2,19 @@ package us.hfgk.ardpicprog;
 
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
+import java.io.Closeable;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.charset.Charset;
 import java.nio.charset.UnsupportedCharsetException;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 abstract class Common {
 	private Common() {
@@ -191,6 +195,25 @@ abstract class Common {
 		// Java did that for us when the array was created.
 
 		return dst;
+	}
+	
+	static boolean closeWarnOnError(Closeable stream, Logger log, String message) {
+		if(stream != null) {
+			try {
+				stream.close();
+			}
+			catch(IOException e) {
+				if(message == null)
+					message = "Error while attempting to close";
+				log.log(Level.WARNING, message + ": ", e);
+				return false;
+			}
+		}
+		return true;
+	}
+	
+	static boolean closeWarnOnError(Closeable stream, Logger log) {
+		return closeWarnOnError(stream, log, null);
 	}
 
 	private static final String[] copyingMessage = { "                    GNU GENERAL PUBLIC LICENSE",

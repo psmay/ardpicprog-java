@@ -1,6 +1,7 @@
 package us.hfgk.ardpicprog;
 
 import java.io.ByteArrayOutputStream;
+import java.io.Closeable;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -9,7 +10,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.logging.Logger;
 
-public class ProgrammerPort {
+public class ProgrammerPort implements Closeable {
 	private static final Logger log = Logger.getLogger(ProgrammerPort.class.getName());
 
 	private static final int BINARY_WORD_TRANSFER_MAX = 32;
@@ -263,7 +264,7 @@ public class ProgrammerPort {
 		return response;
 	}
 
-	void close() throws IOException {
+	public void close() throws IOException {
 		if (com.isStillOpen()) {
 			commandPwroff();
 			com.close();

@@ -17,7 +17,7 @@ class HexFileSerializer {
 	private static int determineOutputExtendedAddress(HexFile hex, OutputStream file, int currentSegment,
 			boolean needsSegments, byte[] buffer, int segment) throws IOException {
 		if (needsSegments && segment != currentSegment) {
-			if (segment < 16 && hex.getFormat() != HexFile.FORMAT_IHX32) {
+			if (segment < 16 && hex.getMetadata().getFormat() != HexFile.FORMAT_IHX32) {
 				// Over 64K boundary: output an Extended Segment Address
 				// Record.
 				currentSegment = outputExtendedAddress(hex, file, buffer, segment, (byte) 0x02, 12);
@@ -57,7 +57,7 @@ class HexFileSerializer {
 	}
 
 	public static void save(HexFile hex, OutputStream file, boolean skipOnes) throws IOException {
-		DeviceDetails device = hex.getDevice();
+		DeviceDetails device = hex.getMetadata().getDevice();
 		saveRange(hex, file, device.programRange, skipOnes);
 		if (!device.configRange.isEmpty()) {
 			if ((device.configRange.size()) >= 8) {
@@ -84,9 +84,9 @@ class HexFileSerializer {
 	private static void saveRange(HexFile hex, OutputStream file, IntRange range) throws IOException {
 		int current = range.start();
 		int currentSegment = ~0;
-		DeviceDetails device = hex.getDevice();
+		DeviceDetails device = hex.getMetadata().getDevice();
 		boolean needsSegments = (rangeIsNotShort(device.programRange) || rangeIsNotShort(device.configRange) || rangeIsNotShort(device.dataRange));
-		int formatz = hex.getFormat();
+		int formatz = hex.getMetadata().getFormat();
 		int format = (formatz == HexFile.FORMAT_AUTO && device.programBits == 16) ? HexFile.FORMAT_IHX32 : formatz;
 		if (format == HexFile.FORMAT_IHX8M)
 			needsSegments = false;
