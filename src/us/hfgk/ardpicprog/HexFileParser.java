@@ -43,7 +43,7 @@ class HexFileParser {
 	public static HexFile load(HexFileMetadata details, InputStream file) throws IOException {
 		if(details == null)
 			throw new IllegalArgumentException();
-		SparseShortList words = new SparseShortList();
+		ShortList words = Common.getBlankShortList();
 		loadIntoShortList(words, file);
 		return new HexFile(details, words);
 	}

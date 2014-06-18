@@ -75,4 +75,15 @@ class IntRange {
 
 		return IntRange.getPost(max(a.start(), b.start()), min(a.post(), b.post()));
 	}
+	
+	public String toString() {
+		String left = "(IntRange '";
+		String right = "' size " + size() + ")";
+		
+		String middle = isEmpty() ?
+				"empty at " + start() :
+				"[" + start() + "," + post() + ")";
+				
+		return left + middle + right;		
+	}
 }

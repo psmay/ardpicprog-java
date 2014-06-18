@@ -196,14 +196,13 @@ abstract class Common {
 
 		return dst;
 	}
-	
+
 	static boolean closeWarnOnError(Closeable stream, Logger log, String message) {
-		if(stream != null) {
+		if (stream != null) {
 			try {
 				stream.close();
-			}
-			catch(IOException e) {
-				if(message == null)
+			} catch (IOException e) {
+				if (message == null)
 					message = "Error while attempting to close";
 				log.log(Level.WARNING, message + ": ", e);
 				return false;
@@ -211,9 +210,59 @@ abstract class Common {
 		}
 		return true;
 	}
-	
+
 	static boolean closeWarnOnError(Closeable stream, Logger log) {
 		return closeWarnOnError(stream, log, null);
+	}
+
+	static ShortList getBlankShortList() {
+		return new DumbShortList();
+	}
+
+	static ReadableShortList getBlankReadableShortList() {
+		return new DumbShortList();
+	}
+
+	private static void copyIntsToShortArray0(int[] src, int srcIndex, short[] dest, int destIndex, int length) {
+		int i;
+		for (i = 0; i < length; ++i)
+			dest[destIndex + i] = (short) src[srcIndex + i];
+	}
+
+	private static void copyUnsignedShortsToIntArray0(short[] src, int srcIndex, int[] dest, int destIndex, int length) {
+		int i;
+		for (i = 0; i < length; ++i)
+			dest[destIndex + i] = 0xFFFF & (int) src[srcIndex + i];
+	}
+
+	static void copyIntsToShortArray(int[] src, int srcIndex, short[] dest, int destIndex, int length) {
+		if (srcIndex < 0 || destIndex < 0 || length < 0 || srcIndex + length > src.length
+				|| destIndex + length > dest.length)
+			throw new ArrayIndexOutOfBoundsException();
+		copyIntsToShortArray0(src, srcIndex, dest, destIndex, length);
+	}
+
+	static short[] copyIntsToShortArray(int[] src, int offset, int length) {
+		if (offset < 0 || length < 0 || offset + length > src.length)
+			throw new ArrayIndexOutOfBoundsException();
+		short[] dest = new short[length];
+		copyIntsToShortArray0(src, offset, dest, 0, length);
+		return dest;
+	}
+
+	static void copyUnsignedShortsToIntArray(short[] src, int srcIndex, int[] dest, int destIndex, int length) {
+		if (srcIndex < 0 || destIndex < 0 || length < 0 || srcIndex + length > src.length
+				|| destIndex + length > dest.length)
+			throw new ArrayIndexOutOfBoundsException();
+		copyUnsignedShortsToIntArray0(src, srcIndex, dest, destIndex, length);
+	}
+
+	static int[] copyUnsignedShortsToIntArray(short[] src, int offset, int length) {
+		if (offset < 0 || length < 0 || offset + length > src.length)
+			throw new ArrayIndexOutOfBoundsException();
+		int[] dest = new int[length];
+		copyUnsignedShortsToIntArray0(src, offset, dest, 0, length);
+		return dest;
 	}
 
 	private static final String[] copyingMessage = { "                    GNU GENERAL PUBLIC LICENSE",

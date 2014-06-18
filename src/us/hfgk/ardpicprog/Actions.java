@@ -46,7 +46,7 @@ public class Actions {
 	}
 
 	static void doOutput(String output, boolean skipOnes, ProgrammerPort port, HexFileMetadata hexMeta) throws IOException {
-		SparseShortList words = new SparseShortList();		
+		ShortList words = Common.getBlankShortList();		
 		HexFile.readFrom(words, port.getShortSource(), hexMeta.getAreas());		
 		HexFile hexFile = new HexFile(hexMeta, words);
 

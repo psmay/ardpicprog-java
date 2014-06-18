@@ -22,7 +22,7 @@ public class HexFile {
 			throw new IllegalArgumentException();
 		
 		if(words == null)
-			words = new SparseShortList();
+			words = Common.getBlankReadableShortList();
 		
 		this.metadata = metadata;
 		this.words = words;
