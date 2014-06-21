@@ -1,0 +1,7 @@
+*.hex
+*.out
+*.properties
+./bin
+.classpath
+.project
+.settings
