@@ -1,6 +1,6 @@
-package us.hfgk.ardpicprog;
+package us.hfgk.ardpicprog.pylike;
 
-final class Tuple2<T1, T2> {
+public final class Tuple2<T1, T2> {
 	public final T1 _1;
 	public final T2 _2;
 	

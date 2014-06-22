@@ -4,6 +4,8 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
+import us.hfgk.ardpicprog.pylike.Tuple2;
+
 public class HexFileMetadata {
 	private final int format;
 	private final DeviceDetails device;

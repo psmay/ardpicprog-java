@@ -6,6 +6,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.logging.Logger;
 
+import us.hfgk.ardpicprog.pylike.Tuple2;
+
 public class HexFile {
 	private static final Logger log = Logger.getLogger(HexFile.class.getName());
 
