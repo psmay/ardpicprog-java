@@ -1,10 +1,14 @@
 package us.hfgk.ardpicprog;
 
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
 import java.util.Map;
 import java.util.logging.Logger;
+
+import us.hfgk.ardpicprog.pylike.Po;
+import us.hfgk.ardpicprog.pylike.PylikeWritable;
+import us.hfgk.ardpicprog.pylike.Str;
 
 public class Actions {
 	private static final Logger log = Logger.getLogger(Actions.class.getName());
@@ -13,8 +17,8 @@ public class Actions {
 		hexFile.writeTo(port, forceCalibration);
 	}
 
-	static void doCCOutput(String ccOutput, boolean skipOnes, HexFile hexFile) throws IOException {
-		OutputStream file = Common.openForWrite(ccOutput);
+	static void doCCOutput(Str ccOutput, boolean skipOnes, HexFile hexFile) throws IOException {
+		PylikeWritable file = Po.openwb(ccOutput);
 		hexFile.saveCC(file, skipOnes);
 		file.close();
 	}
@@ -45,15 +49,16 @@ public class Actions {
 		log.info("Supported devices:\n" + port.devices() + "* = autodetected");
 	}
 
-	static void doOutput(String output, boolean skipOnes, ProgrammerPort port, HexFileMetadata hexMeta) throws IOException {
-		ShortList words = Common.getBlankShortList();		
-		HexFile.readFrom(words, port.getShortSource(), hexMeta.getAreas());		
+	static void doOutput(Str output, boolean skipOnes, ProgrammerPort port, HexFileMetadata hexMeta)
+			throws IOException, HexFileException {
+		ShortList words = Common.getBlankShortList();
+		HexFile.readFrom(words, port.getShortSource(), hexMeta.getAreas());
 		HexFile hexFile = new HexFile(hexMeta, words);
 
-		OutputStream file = null;
+		PylikeWritable file = null;
 		try {
 			try {
-				file = Common.openForWrite(output);
+				file = Po.openwb(output);
 			} catch (IOException e) {
 				log.severe("Could not open " + output + ": " + e.getMessage());
 				throw e;
@@ -87,22 +92,19 @@ public class Actions {
 		log.info("Device " + metadata.getDevice().deviceName + ", program memory: " + metadata.programSizeWords()
 				+ " words, data memory: " + metadata.dataSizeBytes() + " bytes.");
 	}
-	
+
 	static HexFileMetadata getHexMeta(int format, Map<String, String> details) throws IOException {
 		return new HexFileMetadata(new DeviceDetails(details), format);
 	}
-	
+
 	static HexFile loadHexFile(HexFileMetadata metadata, String input) throws IOException {
-		InputStream file = null;		
+		InputStream file = null;
 		try {
 			file = Common.openForRead(input);
 			return HexFileParser.load(metadata, file);
-		}
-		finally {
+		} finally {
 			Common.closeWarnOnError(file, log);
 		}
 	}
-
-
 
 }

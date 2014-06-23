@@ -1,11 +1,11 @@
 package us.hfgk.ardpicprog;
 
 import java.io.IOException;
-import java.io.OutputStream;
 import java.util.List;
 import java.util.Map;
 import java.util.logging.Logger;
 
+import us.hfgk.ardpicprog.pylike.PylikeWritable;
 import us.hfgk.ardpicprog.pylike.Tuple2;
 
 public class HexFile {
@@ -148,11 +148,11 @@ public class HexFile {
 		log.info((count == 1) ? " 1 location," : " " + count + " locations,");
 	}
 
-	public void save(OutputStream file, boolean skipOnes) throws IOException {
+	public void save(PylikeWritable file, boolean skipOnes) throws IOException {
 		HexFileSerializer.save(this, file, skipOnes);
 	}
 
-	public void saveCC(OutputStream file, boolean skipOnes) throws IOException {
+	public void saveCC(PylikeWritable file, boolean skipOnes) throws IOException {
 		HexFileSerializer.saveCC(this, file, skipOnes);
 	}
 

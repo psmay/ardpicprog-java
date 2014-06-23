@@ -27,7 +27,7 @@ public final class Str {
 	private Str(byte[] noncaptive, int off, int len) {
 		this.value = Arrays.copyOfRange(noncaptive, off, off + len);
 	}
-	
+
 	public static Str val(byte[] buffer, int off, int len) {
 		return new Str(buffer, off, len);
 	}
@@ -50,12 +50,25 @@ public final class Str {
 	}
 
 	@Override
+	public String toString() {
+		return String.valueOf(getJavaCharArray());
+	}
+
+	@Override
 	public int hashCode() {
 		return this.toString().hashCode();
 	}
 
 	public byte[] getJavaByteArray() {
 		return Arrays.copyOf(value, value.length);
+	}
+
+	private char[] getJavaCharArray() {
+		char[] chars = new char[value.length];
+		for (int i = 0; i < value.length; ++i) {
+			chars[i] = (char) (0xFF & value[i]);
+		}
+		return chars;
 	}
 
 	public Str join(Str... parts) {
@@ -214,12 +227,11 @@ public final class Str {
 	}
 
 	public byte oPgetitem(int i) {
-		if(i < 0)
+		if (i < 0)
 			i += length();
-		if((i < 0) || (i >= length()))
+		if ((i < 0) || (i >= length()))
 			throw new IndexOutOfBoundsException();
 		return value[i];
 	}
-
 
 }

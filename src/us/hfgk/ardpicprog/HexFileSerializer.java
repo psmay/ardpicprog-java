@@ -1,7 +1,8 @@
 package us.hfgk.ardpicprog;
 
 import java.io.IOException;
-import java.io.OutputStream;
+import us.hfgk.ardpicprog.pylike.PylikeWritable;
+import us.hfgk.ardpicprog.pylike.Str;
 
 class HexFileSerializer {
 
@@ -14,7 +15,7 @@ class HexFileSerializer {
 		return checksum;
 	}
 
-	private static int determineOutputExtendedAddress(HexFile hex, OutputStream file, int currentSegment,
+	private static int determineOutputExtendedAddress(HexFile hex, PylikeWritable file, int currentSegment,
 			boolean needsSegments, byte[] buffer, int segment) throws IOException {
 		if (needsSegments && segment != currentSegment) {
 			if (segment < 16 && hex.getMetadata().getFormat() != HexFile.FORMAT_IHX32) {
@@ -30,7 +31,7 @@ class HexFileSerializer {
 		return currentSegment;
 	}
 
-	private static int outputExtendedAddress(HexFile hex, OutputStream file, byte[] buffer, int segment, byte b3,
+	private static int outputExtendedAddress(HexFile hex, PylikeWritable file, byte[] buffer, int segment, byte b3,
 			int shift) throws IOException {
 		int currentSegment = segment;
 		segment <<= shift;
@@ -44,11 +45,11 @@ class HexFileSerializer {
 		return currentSegment;
 	}
 
-	private static void putByteAsHex(OutputStream file, int z) throws IOException {
+	private static void putByteAsHex(PylikeWritable file, int z) throws IOException {
 		writeString(file, Common.toX2(z));
 	}
 
-	private static void putBytesAsHex(OutputStream file, byte[] buffer, int len) throws IOException {
+	private static void putBytesAsHex(PylikeWritable file, byte[] buffer, int len) throws IOException {
 		writeString(file, Common.toX2(buffer, 0, len));
 	}
 
@@ -56,7 +57,7 @@ class HexFileSerializer {
 		return 0x10000 < range.post();
 	}
 
-	public static void save(HexFile hex, OutputStream file, boolean skipOnes) throws IOException {
+	public static void save(HexFile hex, PylikeWritable file, boolean skipOnes) throws IOException {
 		DeviceDetails device = hex.getMetadata().getDevice();
 		saveRange(hex, file, device.programRange, skipOnes);
 		if (!device.configRange.isEmpty()) {
@@ -74,14 +75,14 @@ class HexFileSerializer {
 		writeEOFRecord(file);
 	}
 
-	public static void saveCC(HexFile hex, OutputStream file, boolean skipOnes) throws IOException {
+	public static void saveCC(HexFile hex, PylikeWritable file, boolean skipOnes) throws IOException {
 		for (IntRange extent : hex.extents()) {
 			saveRange(hex, file, extent, skipOnes);
 		}
 		writeEOFRecord(file);
 	}
 
-	private static void saveRange(HexFile hex, OutputStream file, IntRange range) throws IOException {
+	private static void saveRange(HexFile hex, PylikeWritable file, IntRange range) throws IOException {
 		int current = range.start();
 		int currentSegment = ~0;
 		DeviceDetails device = hex.getMetadata().getDevice();
@@ -112,7 +113,7 @@ class HexFileSerializer {
 		}
 	}
 
-	private static void saveRange(HexFile hex, OutputStream file, IntRange range, boolean skipOnes) throws IOException {
+	private static void saveRange(HexFile hex, PylikeWritable file, IntRange range, boolean skipOnes) throws IOException {
 		int current = range.start();
 		final int post = range.post();
 		if (skipOnes) {
@@ -132,11 +133,11 @@ class HexFileSerializer {
 		}
 	}
 
-	private static void writeEOFRecord(OutputStream file) throws IOException {
+	private static void writeEOFRecord(PylikeWritable file) throws IOException {
 		writeString(file, ":00000001FF\n");
 	}
 
-	private static void writeLine(OutputStream file, byte[] buffer, int len) throws IOException {
+	private static void writeLine(PylikeWritable file, byte[] buffer, int len) throws IOException {
 		int checksum = calculateChecksum(buffer, len);
 		writeString(file, ":");
 		putBytesAsHex(file, buffer, len);
@@ -144,8 +145,13 @@ class HexFileSerializer {
 		writeString(file, "\n");
 	}
 
-	private static void writeString(OutputStream s, String data) throws IOException {
-		s.write(Common.getBytes(data));
+	@Deprecated
+	private static void writeString(PylikeWritable s, String data) throws IOException {
+		write(s, Str.val(data));
+	}
+	
+	private static void write(PylikeWritable s, Str data) throws IOException {
+		s.write(data);
 	}
 
 }

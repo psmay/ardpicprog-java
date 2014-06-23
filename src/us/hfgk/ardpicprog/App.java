@@ -12,6 +12,8 @@ import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import us.hfgk.ardpicprog.pylike.Str;
+
 public class App {
 
 	private static final Logger log = Logger.getLogger(App.class.getName());
@@ -351,7 +353,7 @@ public class App {
 				
 				// Copy the input to the CC output file.
 				if (!Common.stringEmpty(options.ccOutput)) {
-					Actions.doCCOutput(options.ccOutput, options.skipOnes, hexFile);
+					Actions.doCCOutput(Str.val(options.ccOutput), options.skipOnes, hexFile);
 				}
 				
 				// Erase the device if necessary. If --force-calibration is
@@ -372,7 +374,7 @@ public class App {
 			// If we have an output file, then read the contents of the PIC into
 			// it.
 			if (!Common.stringEmpty(options.output)) {
-				Actions.doOutput(options.output, options.skipOnes, port, hexMeta);
+				Actions.doOutput(Str.val(options.output), options.skipOnes, port, hexMeta);
 			}
 		} finally {
 			if (port != null) {
