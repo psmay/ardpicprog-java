@@ -27,6 +27,10 @@ public final class Str {
 	private Str(byte[] noncaptive, int off, int len) {
 		this.value = Arrays.copyOfRange(noncaptive, off, off + len);
 	}
+	
+	public static Str val(byte[] buffer, int off, int len) {
+		return new Str(buffer, off, len);
+	}
 
 	public boolean equals(Str s) {
 		return (s.length() == this.length()) ? startswith(s) : false;
@@ -50,7 +54,7 @@ public final class Str {
 		return this.toString().hashCode();
 	}
 
-	public byte[] jGetBytes() {
+	public byte[] getJavaByteArray() {
 		return Arrays.copyOf(value, value.length);
 	}
 
@@ -204,4 +208,10 @@ public final class Str {
 	private int length() {
 		return value.length;
 	}
+
+	public int oPlen() {
+		return length();
+	}
+
+
 }
