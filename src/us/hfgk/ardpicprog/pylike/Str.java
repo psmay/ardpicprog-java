@@ -8,6 +8,9 @@ public final class Str {
 	public static final Str EMPTY = new Str(new byte[0]);
 
 	public static Str val(String str) {
+		if (str == null)
+			return null;
+
 		if (str.length() == 0)
 			return EMPTY;
 
@@ -32,8 +35,16 @@ public final class Str {
 		return new Str(buffer, off, len);
 	}
 
-	public boolean equals(Str s) {
-		return (s.length() == this.length()) ? startswith(s) : false;
+	public boolean equals(Object o) {
+		return (o instanceof Str) && areEqual(this, (Str) o);
+	}
+
+	public static boolean areEqual(Str a, Str b) {
+		if (a == b)
+			return true;
+		if ((a == null) || (b == null) || (a.length() != b.length()))
+			return false;
+		return a.startswith(b);
 	}
 
 	@Deprecated
@@ -56,7 +67,7 @@ public final class Str {
 
 	@Override
 	public int hashCode() {
-		return this.toString().hashCode();
+		return toString().hashCode();
 	}
 
 	public byte[] getJavaByteArray() {
@@ -86,11 +97,15 @@ public final class Str {
 	}
 
 	public Str pYappend(Str other) {
-		return join(this, other);
+		return EMPTY.join(this, other);
 	}
 
 	public boolean pYin(Str str) {
 		return str.contains(this);
+	}
+
+	public Str pYslice(int startIndex) {
+		return pYslice(startIndex, length());
 	}
 
 	public Str pYslice(int startIndex, int endIndex) {
@@ -235,7 +250,7 @@ public final class Str {
 	}
 
 	public int oPord() {
-		if(length() != 1)
+		if (length() != 1)
 			throw new IllegalArgumentException();
 		return 0xFF & value[0];
 	}
