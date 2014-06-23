@@ -349,7 +349,7 @@ public class App {
 
 			// If there is input to be had, now is the time.
 			if(!Common.stringEmpty(options.input)) {
-				HexFile hexFile = Actions.loadHexFile(hexMeta, options.input);
+				HexFile hexFile = Actions.loadHexFile(hexMeta, Str.val(options.input));
 				
 				// Copy the input to the CC output file.
 				if (!Common.stringEmpty(options.ccOutput)) {

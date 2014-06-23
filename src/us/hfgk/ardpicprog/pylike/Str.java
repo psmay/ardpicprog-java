@@ -234,4 +234,10 @@ public final class Str {
 		return value[i];
 	}
 
+	public int oPord() {
+		if(length() != 1)
+			throw new IllegalArgumentException();
+		return 0xFF & value[0];
+	}
+
 }

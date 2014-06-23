@@ -21,4 +21,8 @@ public class Po {
 	public static byte getitem(Str value, int i) {
 		return value.oPgetitem(i);
 	}
+
+	public static int ord(Str value) {
+		return value.oPord();
+	}
 }

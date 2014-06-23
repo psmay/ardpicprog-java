@@ -2,7 +2,9 @@ package us.hfgk.ardpicprog;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
+import us.hfgk.ardpicprog.pylike.Po;
+import us.hfgk.ardpicprog.pylike.PylikeReadable;
+import us.hfgk.ardpicprog.pylike.Str;
 
 class HexFileParser {
 	// Record types
@@ -40,7 +42,7 @@ class HexFileParser {
 		}
 	}
 
-	public static HexFile load(HexFileMetadata details, InputStream file) throws IOException {
+	public static HexFile load(HexFileMetadata details, PylikeReadable file) throws IOException {
 		if(details == null)
 			throw new IllegalArgumentException();
 		ShortList words = Common.getBlankShortList();
@@ -48,20 +50,23 @@ class HexFileParser {
 		return new HexFile(details, words);
 	}
 
-	private static void loadIntoShortList(ShortList words, InputStream file) throws IOException, HexFileException {
+	private static void loadIntoShortList(ShortList words, PylikeReadable file) throws IOException, HexFileException {
 		boolean startLine = true;
 		ByteArrayOutputStream line = new ByteArrayOutputStream();
-		int ch, digit;
+		int digit;
 		int nibble = -1;
 
 		int baseAddress = 0;
 
-		while ((ch = file.read()) >= 0) {
-
-			if (ch == ' ' || ch == '\t')
+		Str chstr;
+		
+		while (!(chstr = file.read(1)).equals(Str.EMPTY)) {
+			//ch = 0xFF & Po.getitem(chstr, 0);
+			
+			if(chstr.equals(Str.val(" ")) || chstr.equals(Str.val("\t")))
 				continue;
 
-			if (ch == '\r' || ch == '\n') {
+			if(chstr.equals(Str.val("\r")) || chstr.equals(Str.val("\n"))) {
 				if (nibble != -1) {
 					// Half a byte at the end of the line.
 					throw new HexFileException("Half byte at end of line");
@@ -82,7 +87,7 @@ class HexFileParser {
 				continue;
 			}
 
-			digit = examineDigit(ch);
+			digit = examineDigit(Po.ord(chstr));
 
 			if (digit == DIGIT_COLON) {
 				if (!startLine) {
@@ -94,7 +99,7 @@ class HexFileParser {
 				}
 			} else if (digit < 0) {
 				// Invalid character in hex file.
-				throw new HexFileException("Invalid hex character '" + ch + "'");
+				throw new HexFileException("Invalid hex character '" + chstr + "'");
 			} else {
 
 				if (startLine) {

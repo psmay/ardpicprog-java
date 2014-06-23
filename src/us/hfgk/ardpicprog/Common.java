@@ -1,14 +1,7 @@
 package us.hfgk.ardpicprog;
 
-import java.io.BufferedInputStream;
-import java.io.BufferedOutputStream;
 import java.io.Closeable;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
 import java.nio.charset.Charset;
 import java.nio.charset.UnsupportedCharsetException;
 import java.util.Arrays;
@@ -145,14 +138,6 @@ abstract class Common {
 		} catch (NumberFormatException e) {
 			return defaultValue;
 		}
-	}
-
-	static InputStream openForRead(String input) throws FileNotFoundException {
-		return new BufferedInputStream(new FileInputStream(input));
-	}
-
-	static OutputStream openForWrite(String filename) throws FileNotFoundException {
-		return new BufferedOutputStream(new FileOutputStream(filename));
 	}
 
 	static void notice(String... string) {

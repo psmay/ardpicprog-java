@@ -1,11 +1,11 @@
 package us.hfgk.ardpicprog;
 
 import java.io.IOException;
-import java.io.InputStream;
 import java.util.Map;
 import java.util.logging.Logger;
 
 import us.hfgk.ardpicprog.pylike.Po;
+import us.hfgk.ardpicprog.pylike.PylikeReadable;
 import us.hfgk.ardpicprog.pylike.PylikeWritable;
 import us.hfgk.ardpicprog.pylike.Str;
 
@@ -96,10 +96,10 @@ public class Actions {
 		return new HexFileMetadata(new DeviceDetails(details), format);
 	}
 
-	static HexFile loadHexFile(HexFileMetadata metadata, String input) throws IOException {
-		InputStream file = null;
+	static HexFile loadHexFile(HexFileMetadata metadata, Str filename) throws IOException {
+		PylikeReadable file = null;
 		try {
-			file = Common.openForRead(input);
+			file = Po.openrb(filename);
 			return HexFileParser.load(metadata, file);
 		} finally {
 			Common.closeWarnOnError(file, log);
