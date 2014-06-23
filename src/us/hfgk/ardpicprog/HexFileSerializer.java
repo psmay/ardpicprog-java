@@ -53,7 +53,7 @@ class HexFileSerializer {
 		writeString(file, Common.toX2(buffer, 0, len));
 	}
 
-	private static boolean rangeIsNotShort(IntRange range) {
+	private static boolean rangeIsNotShort(AddressRange range) {
 		return 0x10000 < range.post();
 	}
 
@@ -62,10 +62,10 @@ class HexFileSerializer {
 		saveRange(hex, file, device.programRange, skipOnes);
 		if (!device.configRange.isEmpty()) {
 			if ((device.configRange.size()) >= 8) {
-				saveRange(hex, file, IntRange.getSize(device.configRange.start(), 6), skipOnes);
+				saveRange(hex, file, AddressRange.getSize(device.configRange.start(), 6), skipOnes);
 				// Don't bother saving the device ID word at _configRange.start
 				// + 6.
-				saveRange(hex, file, IntRange.getPost(device.configRange.start() + 7, device.configRange.post()),
+				saveRange(hex, file, AddressRange.getPost(device.configRange.start() + 7, device.configRange.post()),
 						skipOnes);
 			} else {
 				saveRange(hex, file, device.configRange, skipOnes);
@@ -76,13 +76,13 @@ class HexFileSerializer {
 	}
 
 	public static void saveCC(HexFile hex, PylikeWritable file, boolean skipOnes) throws IOException {
-		for (IntRange extent : hex.extents()) {
+		for (AddressRange extent : hex.extents()) {
 			saveRange(hex, file, extent, skipOnes);
 		}
 		writeEOFRecord(file);
 	}
 
-	private static void saveRange(HexFile hex, PylikeWritable file, IntRange range) throws IOException {
+	private static void saveRange(HexFile hex, PylikeWritable file, AddressRange range) throws IOException {
 		int current = range.start();
 		int currentSegment = ~0;
 		DeviceDetails device = hex.getMetadata().getDevice();
@@ -113,7 +113,7 @@ class HexFileSerializer {
 		}
 	}
 
-	private static void saveRange(HexFile hex, PylikeWritable file, IntRange range, boolean skipOnes) throws IOException {
+	private static void saveRange(HexFile hex, PylikeWritable file, AddressRange range, boolean skipOnes) throws IOException {
 		int current = range.start();
 		final int post = range.post();
 		if (skipOnes) {
@@ -125,11 +125,11 @@ class HexFileSerializer {
 				int limit = current + 1;
 				while (limit < post && !hex.isAllOnes(limit))
 					++limit;
-				saveRange(hex, file, IntRange.getPost(current, limit));
+				saveRange(hex, file, AddressRange.getPost(current, limit));
 				current = limit;
 			}
 		} else {
-			saveRange(hex, file, IntRange.getPost(current, post));
+			saveRange(hex, file, AddressRange.getPost(current, post));
 		}
 	}
 

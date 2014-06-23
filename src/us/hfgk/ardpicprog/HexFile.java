@@ -45,7 +45,7 @@ public class HexFile {
 	public static final int FORMAT_IHX16 = 1;
 	public static final int FORMAT_IHX32 = 2;
 
-	public List<IntRange> extents() {
+	public List<AddressRange> extents() {
 		return words.extents();
 	}
 
@@ -79,17 +79,17 @@ public class HexFile {
 	}
 
 	public static boolean blankCheckRead(HexFileMetadata metadata, ShortSource source) throws IOException {
-		for (Tuple2<String, IntRange> area : metadata.getAreas()) {			
+		for (Tuple2<String, AddressRange> area : metadata.getAreas()) {			
 			if (!blankCheckArea(metadata, source, area))
 				return false;
 		}
 		return true;
 	}
 
-	private static boolean blankCheckArea(HexFileMetadata metadata, ShortSource shortSource, Tuple2<String, IntRange> area)
+	private static boolean blankCheckArea(HexFileMetadata metadata, ShortSource shortSource, Tuple2<String, AddressRange> area)
 			throws IOException {
 		String areaDesc = area._1;
-		IntRange range = area._2;
+		AddressRange range = area._2;
 		if (!range.isEmpty()) {
 			log.info("Blank checking " + areaDesc + ",");			
 			if (blankCheckFrom(metadata, shortSource, range)) {
@@ -105,22 +105,22 @@ public class HexFile {
 		}
 	}
 
-	public static void readFrom(ShortList words, ShortSource source, List<Tuple2<String, IntRange>> areas)
+	public static void readFrom(ShortList words, ShortSource source, List<Tuple2<String, AddressRange>> areas)
 			throws IOException {
 		words.clear();
 		// List<Tuple2<String, IntRange>> areas = getAreas();
 
-		for (Tuple2<String, IntRange> rd : areas) {
+		for (Tuple2<String, AddressRange> rd : areas) {
 			readAreaFrom(words, source, rd);
 		}
 
 		log.info("done.");
 	}
 
-	private static void readAreaFrom(ShortList words, ShortSource source, Tuple2<String, IntRange> area)
+	private static void readAreaFrom(ShortList words, ShortSource source, Tuple2<String, AddressRange> area)
 			throws IOException {
 		String areaDesc = area._1;
-		IntRange range = area._2;
+		AddressRange range = area._2;
 		if (!range.isEmpty()) {
 			log.info("Reading " + areaDesc + ",");
 			words.readFrom(source, range);
@@ -129,7 +129,7 @@ public class HexFile {
 		}
 	}
 
-	private static boolean blankCheckFrom(HexFileMetadata metadata, ShortSource source, IntRange range) throws IOException {
+	private static boolean blankCheckFrom(HexFileMetadata metadata, ShortSource source, AddressRange range) throws IOException {
 		final short[] buf = new short[range.size()];
 
 		source.readTo(range, buf, 0);
@@ -166,7 +166,7 @@ public class HexFile {
 		// about.
 		// Else, assumes: reserved words are always at the end of program
 		// memory.
-		IntRange programRangeForWrite = (forceCalibration || getMetadata().getDevice().reservedRange.isEmpty()) ? getMetadata().getDevice().programRange
+		AddressRange programRangeForWrite = (forceCalibration || getMetadata().getDevice().reservedRange.isEmpty()) ? getMetadata().getDevice().programRange
 				: programStartToReservedStart();
 
 		// Write the contents of program memory.
@@ -182,11 +182,11 @@ public class HexFile {
 		log.info("done.");
 	}
 
-	private IntRange programStartToReservedStart() {
-		return IntRange.getPost(getMetadata().getDevice().programRange.start(), getMetadata().getDevice().reservedRange.start());
+	private AddressRange programStartToReservedStart() {
+		return AddressRange.getPost(getMetadata().getDevice().programRange.start(), getMetadata().getDevice().reservedRange.start());
 	}
 
-	private void writeArea(ShortSink sink, String desc, IntRange range, boolean skip) throws IOException {
+	private void writeArea(ShortSink sink, String desc, AddressRange range, boolean skip) throws IOException {
 		if (skip)
 			log.info("Skipped burning " + desc + ",");
 		else {

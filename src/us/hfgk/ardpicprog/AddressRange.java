@@ -1,6 +1,6 @@
 package us.hfgk.ardpicprog;
 
-class IntRange {
+class AddressRange {
 	private final int start;
 	private final int post;
 
@@ -20,30 +20,30 @@ class IntRange {
 		return post - start;
 	}
 
-	private IntRange(int start, int post) {
+	private AddressRange(int start, int post) {
 		this.start = start;
 		if (post <= start)
 			post = start;
 		this.post = post;
 	}
 
-	static IntRange getPost(int start, int post) {
-		return new IntRange(start, post);
+	static AddressRange getPost(int start, int post) {
+		return new AddressRange(start, post);
 	}
 
-	static IntRange getEnd(int start, int end) {
+	static AddressRange getEnd(int start, int end) {
 		return getPost(start, end + 1);
 	}
 
-	static IntRange getSize(int start, int size) {
+	static AddressRange getSize(int start, int size) {
 		return getPost(start, start + size);
 	}
 
-	static IntRange empty(int start) {
+	static AddressRange empty(int start) {
 		return getPost(start, start);
 	}
 
-	boolean intersects(IntRange other) {
+	boolean intersects(AddressRange other) {
 		return this.start < other.post && this.post > other.start;
 	}
 
@@ -57,7 +57,7 @@ class IntRange {
 
 	// If this does not intersect that, the result is an empty range whose start
 	// is the greater of this start or that start.
-	IntRange intersection(IntRange that) {
+	AddressRange intersection(AddressRange that) {
 		return intersection(this, that);
 	}
 
@@ -69,21 +69,19 @@ class IntRange {
 		return (a > b) ? a : b;
 	}
 
-	private static IntRange intersection(IntRange a, IntRange b) {
+	private static AddressRange intersection(AddressRange a, AddressRange b) {
 		if (a == null || b == null)
 			return null;
 
-		return IntRange.getPost(max(a.start(), b.start()), min(a.post(), b.post()));
+		return AddressRange.getPost(max(a.start(), b.start()), min(a.post(), b.post()));
 	}
-	
+
 	public String toString() {
-		String left = "(IntRange '";
+		String left = "(AddressRange '";
 		String right = "' size " + size() + ")";
-		
-		String middle = isEmpty() ?
-				"empty at " + start() :
-				"[" + start() + "," + post() + ")";
-				
-		return left + middle + right;		
+
+		String middle = isEmpty() ? "empty at " + start() : "[" + start() + "," + post() + ")";
+
+		return left + middle + right;
 	}
 }

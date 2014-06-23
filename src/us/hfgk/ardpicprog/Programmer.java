@@ -44,11 +44,11 @@ public class Programmer implements Closeable {
 		}
 	}
 
-	private RxTxProgrammerCommPort com = null;
+	private ProgrammerCommPort com = null;
 
 	private CommBuffer buff = new CommBuffer();
 
-	Programmer(RxTxProgrammerCommPort com) throws IOException {
+	Programmer(ProgrammerCommPort com) throws IOException {
 		this.com = com;
 		com.setReceiveTimeout(1000);
 		boolean versionCompatible = pollVersion(0);
@@ -312,15 +312,15 @@ public class Programmer implements Closeable {
 		command(Str.val("PWROFF"));
 	}
 
-	private void commandReadBin(IntRange range) throws IOException {
+	private void commandReadBin(AddressRange range) throws IOException {
 		command(Str.val("READBIN ").pYappend(hyphenateRange(range)));
 	}
 
-	private Str hyphenateRange(IntRange range) {
+	private Str hyphenateRange(AddressRange range) {
 		return Str.val(hyphenateRangeJava(range));
 	}
 
-	private String hyphenateRangeJava(IntRange range) {
+	private String hyphenateRangeJava(AddressRange range) {
 		return Common.toX4("-", (short) range.start(), (short) range.end());
 	}
 
@@ -378,7 +378,7 @@ public class Programmer implements Closeable {
 			this.forceCalibration = forceCalibration;
 		}
 
-		public void writeFrom(IntRange range, short[] data, int offset) throws IOException {
+		public void writeFrom(AddressRange range, short[] data, int offset) throws IOException {
 			ByteArrayOutputStream buffer = new ByteArrayOutputStream(Programmer.BINARY_WORD_TRANSFER_MAX * 2 + 1);
 			int wordlen = (range.size());
 
@@ -406,7 +406,7 @@ public class Programmer implements Closeable {
 		}
 
 		@Override
-		public void readTo(IntRange range, short[] data, int offset) throws IOException {
+		public void readTo(AddressRange range, short[] data, int offset) throws IOException {
 			int current = range.start();
 			byte[] buffer = new byte[256];
 

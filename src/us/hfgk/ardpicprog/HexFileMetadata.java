@@ -55,12 +55,12 @@ public class HexFileMetadata {
 		return (short) ((1 << bitWidthAtAddress(address)) - 1);
 	}
 	
-	List<Tuple2<String, IntRange>> getAreas() {
-		List<Tuple2<String, IntRange>> ls = new ArrayList<Tuple2<String, IntRange>>();
+	List<Tuple2<String, AddressRange>> getAreas() {
+		List<Tuple2<String, AddressRange>> ls = new ArrayList<Tuple2<String, AddressRange>>();
 
-		ls.add(new Tuple2<String, IntRange>("program memory", device.programRange));
-		ls.add(new Tuple2<String, IntRange>("data memory", device.dataRange));
-		ls.add(new Tuple2<String, IntRange>("id words and fuses", device.configRange));
+		ls.add(new Tuple2<String, AddressRange>("program memory", device.programRange));
+		ls.add(new Tuple2<String, AddressRange>("data memory", device.dataRange));
+		ls.add(new Tuple2<String, AddressRange>("id words and fuses", device.configRange));
 
 		return Collections.unmodifiableList(ls);
 	}

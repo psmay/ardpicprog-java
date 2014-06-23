@@ -7,10 +7,10 @@ import us.hfgk.ardpicprog.pylike.Str;
 
 final class DeviceDetails {
 	final Str deviceName;
-	final IntRange programRange;
-	final IntRange configRange;
-	final IntRange dataRange;
-	final IntRange reservedRange;
+	final AddressRange programRange;
+	final AddressRange configRange;
+	final AddressRange dataRange;
+	final AddressRange reservedRange;
 	final int programBits;
 	final int dataBits;
 
@@ -40,11 +40,11 @@ final class DeviceDetails {
 		return (value != null) ? value : Str.EMPTY;
 	}
 
-	private static IntRange parseRangeUnlessEmpty(Str value, int emptyStartAddress) throws HexFileException {
-		return Common.strEmpty(value) ? IntRange.empty(emptyStartAddress) : parseRange(value);
+	private static AddressRange parseRangeUnlessEmpty(Str value, int emptyStartAddress) throws HexFileException {
+		return Common.strEmpty(value) ? AddressRange.empty(emptyStartAddress) : parseRange(value);
 	}
 
-	private static IntRange parseRange(Str value) throws HexFileException {
+	private static AddressRange parseRange(Str value) throws HexFileException {
 		int index = value.find((byte)'-');
 		if (index == -1)
 			throw new HexFileException("Invalid range '" + value + "' (missing '-')");
@@ -55,7 +55,7 @@ final class DeviceDetails {
 		end = Common.parseHex(value.pYslice(index + 1));
 		if (end == null)
 			throw new HexFileException("Invalid range '" + value + "' (end not a number)");
-		return IntRange.getEnd(start, end);
+		return AddressRange.getEnd(start, end);
 	}
 
 	private static Str fetchMap(Map<Str, Str> details, Str key, Str defValue) {

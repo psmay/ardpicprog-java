@@ -81,7 +81,7 @@ public class Actions {
 
 	static Programmer getProgrammerPort(String port, int speed) throws IOException {
 		log.info("Initializing programmer on port " + port + " ...");
-		RxTxProgrammerCommPort pcom = new RxTxProgrammerCommPort();
+		ProgrammerCommPort pcom = new ProgrammerCommPort();
 		pcom.open(port, speed);
 		Programmer prog = new Programmer(pcom);
 		return prog;

@@ -9,7 +9,7 @@ interface ReadableShortList {
 	 * Returns a list of index ranges in which this list is known to be
 	 * populated.
 	 */
-	List<IntRange> extents();
+	List<AddressRange> extents();
 
 	/**
 	 * Returns the value at the given index of this list, or
@@ -27,5 +27,5 @@ interface ReadableShortList {
 	 * Copies values from the indices of this list specified by {@code range}
 	 * into {@code sink}.
 	 */
-	int writeTo(ShortSink sink, IntRange range) throws IOException;
+	int writeTo(ShortSink sink, AddressRange range) throws IOException;
 }

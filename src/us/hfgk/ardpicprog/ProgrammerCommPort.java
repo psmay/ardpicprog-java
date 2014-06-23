@@ -12,7 +12,7 @@ import us.hfgk.ardpicprog.pylike.Serial.Parity;
 import us.hfgk.ardpicprog.pylike.Serial.StopBits;
 import us.hfgk.ardpicprog.pylike.Str;
 
-public class RxTxProgrammerCommPort {
+public class ProgrammerCommPort {
 	private Serial ser = null;
 
 	private static final int DEFAULT_TIMEOUT_MILLISECONDS = 3000;
@@ -23,11 +23,11 @@ public class RxTxProgrammerCommPort {
 		return "/dev/ttyACM0";
 	}
 
-	public RxTxProgrammerCommPort() {
+	public ProgrammerCommPort() {
 		this(DEFAULT_TIMEOUT_MILLISECONDS);
 	}
 
-	public RxTxProgrammerCommPort(int timeoutMs) {
+	public ProgrammerCommPort(int timeoutMs) {
 		this.timeoutMs = timeoutMs;
 	}
 

@@ -24,10 +24,10 @@ public class DumbShortList implements ShortList {
 		}
 	}
 
-	private List<IntRange> extentsWithin(IntRange overRange) {
-		ArrayList<IntRange> ranges = new ArrayList<IntRange>();
+	private List<AddressRange> extentsWithin(AddressRange overRange) {
+		ArrayList<AddressRange> ranges = new ArrayList<AddressRange>();
 
-		IntRange range = IntRange.empty(overRange.start());
+		AddressRange range = AddressRange.empty(overRange.start());
 		int post = overRange.post();
 
 		while (!(range = firstRangeAfter(range, post)).isEmpty()) {
@@ -39,15 +39,15 @@ public class DumbShortList implements ShortList {
 	}
 
 	@Override
-	public List<IntRange> extents() {
-		return extentsWithin(IntRange.getPost(0, buffer.length));
+	public List<AddressRange> extents() {
+		return extentsWithin(AddressRange.getPost(0, buffer.length));
 	}
 
-	private IntRange firstRangeAfter(IntRange previous, int post) {
+	private AddressRange firstRangeAfter(AddressRange previous, int post) {
 		return firstRange(previous.post(), post);
 	}
 
-	private IntRange firstRange(int start, int post) {
+	private AddressRange firstRange(int start, int post) {
 		int startRange, postRange;
 
 		for (startRange = start; startRange < post; ++startRange) {
@@ -59,7 +59,7 @@ public class DumbShortList implements ShortList {
 				break;
 		}
 
-		return IntRange.getPost(startRange, postRange);
+		return AddressRange.getPost(startRange, postRange);
 	}
 
 	@Override
@@ -81,13 +81,13 @@ public class DumbShortList implements ShortList {
 	}
 
 	@Override
-	public int writeTo(ShortSink sink, IntRange writeRange) throws IOException {
-		List<IntRange> ranges = extentsWithin(writeRange);
+	public int writeTo(ShortSink sink, AddressRange writeRange) throws IOException {
+		List<AddressRange> ranges = extentsWithin(writeRange);
 		int actualCopiedCount = 0;
 
 		short[] send = new short[0];
 
-		for (IntRange range : ranges) {
+		for (AddressRange range : ranges) {
 			log.finest("On range: " + range);
 			if (send.length < range.size()) {
 				send = new short[range.size()];
@@ -126,7 +126,7 @@ public class DumbShortList implements ShortList {
 	}
 
 	@Override
-	public void readFrom(ShortSource source, IntRange range) throws IOException {
+	public void readFrom(ShortSource source, AddressRange range) throws IOException {
 		log.finest("Set indices " + range + " from source");
 		short[] receive = new short[range.size()];
 		source.readTo(range, receive, 0);
