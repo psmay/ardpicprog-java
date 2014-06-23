@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
+import us.hfgk.ardpicprog.pylike.Str;
 import us.hfgk.ardpicprog.pylike.Tuple2;
 
 public class HexFileMetadata {
@@ -12,7 +13,7 @@ public class HexFileMetadata {
 
 	public HexFileMetadata(DeviceDetails device, int format) throws HexFileException {
 		if (device == null) {
-			device = new DeviceDetails(Collections.<String, String> emptyMap());
+			device = new DeviceDetails(Collections.<Str, Str> emptyMap());
 		}
 		this.device = device;
 		this.format = validateFormat(format);

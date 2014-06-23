@@ -6,6 +6,7 @@ import java.util.Map;
 import java.util.logging.Logger;
 
 import us.hfgk.ardpicprog.pylike.PylikeWritable;
+import us.hfgk.ardpicprog.pylike.Str;
 import us.hfgk.ardpicprog.pylike.Tuple2;
 
 public class HexFile {
@@ -15,7 +16,7 @@ public class HexFile {
 
 	private ReadableShortList words;
 
-	public HexFile(Map<String, String> details, int format, ReadableShortList words) throws HexFileException {
+	public HexFile(Map<Str, Str> details, int format, ReadableShortList words) throws HexFileException {
 		this(new DeviceDetails(details), format, words);
 	}
 
@@ -34,7 +35,7 @@ public class HexFile {
 		this(new HexFileMetadata(device, format), words);
 	}
 
-	public HexFile(Map<String, String> details, int format) throws HexFileException {
+	public HexFile(Map<Str, Str> details, int format) throws HexFileException {
 		this(details, format, null);
 	}
 

@@ -331,7 +331,7 @@ public class App {
 			}
 
 			// Initialize the device.
-			Map<String, String> details = port.initDevice(options.device);
+			Map<Str, Str> details = port.initDevice(Str.val(options.device));
 
 			// Copy the device details into the hex file object.
 			// Get the input file data if specified.

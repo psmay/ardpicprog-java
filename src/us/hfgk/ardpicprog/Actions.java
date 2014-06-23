@@ -92,7 +92,7 @@ public class Actions {
 				+ " words, data memory: " + metadata.dataSizeBytes() + " bytes.");
 	}
 
-	static HexFileMetadata getHexMeta(int format, Map<String, String> details) throws IOException {
+	static HexFileMetadata getHexMeta(int format, Map<Str, Str> details) throws IOException {
 		return new HexFileMetadata(new DeviceDetails(details), format);
 	}
 

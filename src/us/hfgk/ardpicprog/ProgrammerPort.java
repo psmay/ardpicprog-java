@@ -13,11 +13,14 @@ import us.hfgk.ardpicprog.pylike.Serial;
 import us.hfgk.ardpicprog.pylike.Str;
 
 public class ProgrammerPort implements Closeable {
+
 	private static final Logger log = Logger.getLogger(ProgrammerPort.class.getName());
 
 	private static final int BINARY_WORD_TRANSFER_MAX = 32;
 
 	private static final Str TERM_PACKET = Str.val(new byte[] { 0x00 }, 0, 1);
+
+	private static final Str DETAIL_DEVICE_NAME = Str.val("DeviceName");
 
 	public static class CommBuffer {
 		private int pos = 0;
@@ -60,15 +63,16 @@ public class ProgrammerPort implements Closeable {
 			retry = 5;
 		while (retry > 0) {
 			log.fine("Requesting programmer version");
-			writeString("PROGRAM_PIC_VERSION\n");
+			putln(Str.val("PROGRAM_PIC_VERSION"));
 			log.finest("Waiting for programmer version");
-			String response = readProgrammerLine();
-			if (!Common.stringEmpty(response)) {
-				if (response.indexOf("ProgramPIC 1.") == 0) {
+			Str response = readProgrammerLine();
+			if (!response.equals(Str.EMPTY)) {
+				log.fine("Non-empty response: '" + response + "'");
+				if (response.startswith(Str.val("ProgramPIC 1."))) {
 					// We've found a version 1 sketch, which we can talk to.
 					log.fine("Found recognized programmer version");
 					return true;
-				} else if (response.indexOf("ProgramPIC ") == 0) {
+				} else if (response.startswith(Str.val("ProgramPIC "))) {
 					// Version 2 or higher sketch - cannot talk to this.
 					log.fine("Found incompatible programmer version");
 					return false;
@@ -82,11 +86,11 @@ public class ProgrammerPort implements Closeable {
 		return (retry > 0);
 	}
 
-	private static boolean deviceNameMatch(String name1, String name2) {
-		return name1.equalsIgnoreCase(name2);
+	private static boolean deviceNameMatch(Str name1, Str name2) {
+		return name1.lower().equals(name2.lower());
 	}
 
-	Map<String, String> initDevice(String deviceName) throws IOException {
+	Map<Str, Str> initDevice(Str deviceName) throws IOException {
 		// Try the "DEVICE" command first to auto-detect the type of
 		// device that is in the programming socket.
 		try {
@@ -101,17 +105,18 @@ public class ProgrammerPort implements Closeable {
 		// know the type of device in the socket, but it isn't what we wanted.
 		// If the DeviceID is "0000" but we have a DeviceName, then the device
 		// is an EEPROM that needs a manual override to change the default.
-		Map<String, String> details = readDeviceInfo();
-		String detailsDeviceName = details.get("DeviceName");
-		String detailsDeviceID = details.get("DeviceID");
+		Map<Str, Str> details = readDeviceInfo();
+
+		Str detailsDeviceName = details.get(DETAIL_DEVICE_NAME);
+		Str detailsDeviceID = details.get(Str.val("DeviceID"));
 
 		if (detailsDeviceName != null) {
 
-			if (Common.stringEmpty(deviceName) || deviceName.equals("auto")
+			if (Common.strEmpty(deviceName) || deviceName.equals(Str.val("auto"))
 					|| deviceNameMatch(deviceName, detailsDeviceName))
 				return details;
 
-			if (detailsDeviceID == null || !detailsDeviceID.equals("0000")) {
+			if (detailsDeviceID == null || !detailsDeviceID.equals(Str.val("0000"))) {
 				throw new DeviceException("Expecting " + deviceName + " but found "
 						+ ((detailsDeviceID == null) ? "an unrecognized device" : detailsDeviceID)
 						+ " in the programmer");
@@ -120,13 +125,13 @@ public class ProgrammerPort implements Closeable {
 
 		// If the DeviceID is not "0000", then the device in the socket reports
 		// a device identifier, but it is not supported by the programmer.
-		if (detailsDeviceID != null && !detailsDeviceID.equals("0000")) {
+		if (detailsDeviceID != null && !detailsDeviceID.equals(Str.val("0000"))) {
 			throw new DeviceException("Unsupported device in programmer, ID = " + detailsDeviceID);
 		}
 
 		// If the user wanted to auto-detect the device type, then fail now
 		// because we don't know what we have in the socket.
-		if (deviceName.isEmpty() || deviceName.equals("auto")) {
+		if (deviceName.equals(Str.EMPTY) || deviceName.equals(Str.val("auto"))) {
 			throw new DeviceException("Cannot autodetect: device in programmer does not have an identifier.");
 		}
 
@@ -147,36 +152,36 @@ public class ProgrammerPort implements Closeable {
 		}
 	}
 
+	private static final Str NEWL = Str.val("\n");
+
+	private void putln(Str cmd) throws IOException {
+		com.write(cmd.pYappend(NEWL));
+	}
+
 	// Sends a command to the sketch. Returns true if the response is "OK".
 	// Throws if the response is "ERROR" or a timeout occurred.
-	private void command(String cmd) throws IOException {
-		String line = cmd + "\n";
-
+	private void command(Str cmd) throws IOException {
 		log.fine("Command " + cmd + ": issuing");
-		writeString(line);
+		putln(cmd);
 
-		String response;
+		Str response;
 
 		do {
 			log.finest("Command " + cmd + ": Reading result line");
 			response = readProgrammerLine();
 			log.finest("Command " + cmd + ": Read line '" + response + "'");
-		} while (response.equals("PENDING")); // int-running operation: sketch
-												// has asked for a inter
-												// timeout.
-		if (!response.equals("OK")) {
+		} while (response.equals(Str.val("PENDING"))); // int-running operation:
+														// sketch
+		// has asked for a inter
+		// timeout.
+		if (!response.equals(Str.val("OK"))) {
 			throw new CommandException("Response to command '" + cmd + "' not OK: '" + response + "'");
 		}
 		log.fine("Command " + cmd + ": Got OK response");
 	}
 
-	private void writeString(String str) throws IOException {
-		// FIXME
-		com.write(Str.val(str));
-	}
-
 	// Returns a list of the available devices.
-	String devices() throws IOException {
+	Str devices() throws IOException {
 		commandDevices();
 		return readMultiLineResponse();
 	}
@@ -195,8 +200,8 @@ public class ProgrammerPort implements Closeable {
 		return buff.readProgrammerByte(this);
 	}
 
-	private String readProgrammerLine() throws IOException {
-		String line = "";
+	private Str readProgrammerLine() throws IOException {
+		Str line = Str.EMPTY;
 		int ch;
 
 		boolean timedOut = false;
@@ -205,60 +210,48 @@ public class ProgrammerPort implements Closeable {
 			if (ch == 0x0A)
 				return line;
 			else if (ch != 0x0D && ch != 0x00)
-				line += (char) ch;
+				line = line.pYappend((byte) ch);
 		}
 
-		if (line.isEmpty() && timedOut)
+		if (line.equals(Str.EMPTY) && timedOut)
 			throw new ProgrammerException("Timed out");
 
 		return line;
 	}
 
 	// Reads a multi-line response, terminated by ".", from the sketch.
-	private String readMultiLineResponse() throws IOException {
-		String response = "";
-		String line;
+	private Str readMultiLineResponse() throws IOException {
+		Str response = Str.EMPTY;
+		Str line;
 		for (;;) {
 			line = readProgrammerLine();
-			if (line == null || line.equals("."))
+			if (line == null || line.equals(Str.val(".")))
 				break;
-			response += line;
-			response += '\n';
+			response = response.pYappend(line).pYappend((byte) '\n');
 		}
 		return response;
 	}
 
-	private static String trim(String str) {
-		int first = 0;
-		int last = str.length();
-		while (first < last) {
-			char ch = str.charAt(first);
-			if (ch != ' ' && ch != '\t')
-				break;
-			++first;
-		}
-		while (first < last) {
-			char ch = str.charAt(last - 1);
-			if (ch != ' ' && ch != '\t')
-				break;
-			--last;
-		}
-		return str.substring(first, last);
-	}
-
 	// Reads device information from a multi-line response and returns it as a
 	// map.
-	private Map<String, String> readDeviceInfo() throws IOException {
-		Map<String, String> response = new HashMap<String, String>();
-		String line;
+	private Map<Str, Str> readDeviceInfo() throws IOException {
+		log.finest("Reading device info");
+		Map<Str, Str> response = new HashMap<Str, Str>();
+		Str line;
 
 		for (;;) {
 			line = readProgrammerLine();
-			if (line == null || line.equals("."))
+			log.finest("Line is: '" + line + "'");
+			if (line == null || line.equals(Str.val(".")))
 				break;
-			int index = line.indexOf(':');
+			int index = line.find((byte) ':');
 			if (index >= 0) {
-				response.put(trim(line.substring(0, index)), trim(line.substring(index + 1)));
+				Str key = line.pYslice(0, index).strip();
+				Str value = line.pYslice(index + 1).strip();
+				log.finest("Mapping " + key + " -> " + value);
+				response.put(key, value);
+			} else {
+				log.finest("No ':' found");
 			}
 		}
 		return response;
@@ -294,47 +287,75 @@ public class ProgrammerPort implements Closeable {
 
 	private void writePacket(Str s) throws IOException, PacketResponseException {
 		log.finest("Writing " + Po.len(s) + " byte(s) as packet");
-		this.com.write(s);
-		String response = this.readProgrammerLine();
-		if (!response.equals("OK"))
+		com.write(s);
+		Str response = this.readProgrammerLine();
+		if (!response.equals(Str.val("OK")))
 			throw new PacketResponseException("Packet response was '" + response + "'; expected 'OK'");
 	}
 
 	private void commandDevice() throws IOException {
-		command("DEVICE");
+		command(Str.val("DEVICE"));
 	}
 
 	private void commandDevices() throws IOException {
-		command("DEVICES");
+		command(Str.val("DEVICES"));
 	}
 
 	void commandErase(boolean force) throws IOException {
 		if (force) {
-			command("ERASE NOPRESERVE");
+			command(Str.val("ERASE NOPRESERVE"));
 		} else {
-			command("ERASE");
+			command(Str.val("ERASE"));
 		}
 	}
 
 	private void commandPwroff() throws IOException {
-		command("PWROFF");
+		command(Str.val("PWROFF"));
 	}
 
 	private void commandReadBin(IntRange range) throws IOException {
-		command("READBIN " + Common.toX4("-", (short) range.start(), (short) range.end()));
+		command(Str.val("READBIN ").pYappend(hyphenateRange(range)));
 	}
 
-	private Map<String, String> commandSetDevice(String deviceName) throws IOException {
-		command("SETDEVICE " + deviceName);
+	private Str hyphenateRange(IntRange range) {
+		return Str.val(hyphenateRangeJava(range));
+	}
+
+	private String hyphenateRangeJava(IntRange range) {
+		return Common.toX4("-", (short) range.start(), (short) range.end());
+	}
+
+	private Map<Str, Str> commandSetDevice(Str deviceName) throws IOException {
+		command(Str.val("SETDEVICE ").pYappend(deviceName));
 		return readDeviceInfo();
 	}
 
 	private void commandWriteBin(int start, boolean force) throws IOException {
-		command("WRITEBIN " + (force ? "FORCE " : "") + Common.toX4(" ", (short) start));
+		command(Str.val("WRITEBIN ").pYappend(forceArg(force)).pYappend(hexStart(start)));
+	}
+
+	private Str hexStart(int start) {
+		return Str.val(hexStartJava(start));
+	}
+
+	private String hexStartJava(int start) {
+		return Common.toX4(" ", (short) start);
+	}
+
+	private Str forceArg(boolean force) {
+		return force ? Str.val("FORCE ") : Str.EMPTY;
 	}
 
 	private void commandWrite(int start, boolean force, short... values) throws IOException {
-		command("WRITE " + (force ? "FORCE " : "") + Common.toX4(" ", (short) start) + " " + Common.toX4(" ", values));
+		command(Str.val("WRITE ").pYappend(forceArg(force)).pYappend(hexSpace(start, values)));
+	}
+
+	private Str hexSpace(int start, short... values) {
+		return Str.val(hexSpaceJava(start, values));
+	}
+
+	private String hexSpaceJava(int start, short... values) {
+		return hexStart(start) + " " + Common.toX4(" ", values);
 	}
 
 	ShortSource getShortSource() {

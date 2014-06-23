@@ -9,6 +9,9 @@ import java.util.Collection;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import us.hfgk.ardpicprog.pylike.Re;
+import us.hfgk.ardpicprog.pylike.Str;
+
 abstract class Common {
 	private Common() {
 	}
@@ -52,20 +55,20 @@ abstract class Common {
 		}
 	}
 
-	static Integer parseHex(String str) {
+	static Integer parseHex(Str str) {
 		// The rules from the original are these:
 		// - The string must contain at least one hex digit.
 		// - The string must not contain '\t' or ' '.
 		// - Any other characters may appear and are ignored.
-		if (str.contains(" ") || str.contains("\t"))
+		if (Str.val(" ").pYin(str) || Str.val("\t").pYin(str))
 			return null;
 
-		String digits = str.replaceAll("[^0-9A-Fa-f]+", "");
+		Str digits = Re.sub(Str.val("[^0-9A-Fa-f]+"), Str.val(""), str);
 
-		if (digits.equals(""))
+		if (digits.equals(Str.EMPTY))
 			return null;
 
-		return Integer.parseInt(digits, 16);
+		return Integer.parseInt(digits.toString(), 16);
 	}
 
 	static String toX2(int value) {
@@ -132,9 +135,9 @@ abstract class Common {
 		return Integer.parseInt(string, 10);
 	}
 
-	static int parseInt(String string, int defaultValue) {
+	static int parseInt(Str str, int defaultValue) {
 		try {
-			return Integer.parseInt(string, 10);
+			return Integer.parseInt(str.toString(), 10);
 		} catch (NumberFormatException e) {
 			return defaultValue;
 		}
@@ -146,6 +149,10 @@ abstract class Common {
 		}
 	}
 
+	static boolean strEmpty(Str s) {
+		return (s == null) || s.equals(Str.EMPTY);
+	}
+	
 	static boolean stringEmpty(String s) {
 		return (s == null) || (s.isEmpty());
 	}
@@ -724,5 +731,7 @@ abstract class Common {
 			"an absolute waiver of all civil liability in connection with the",
 			"Program, unless a warranty or assumption of liability accompanies a",
 			"copy of the Program in return for a fee." };
+
+
 
 }
