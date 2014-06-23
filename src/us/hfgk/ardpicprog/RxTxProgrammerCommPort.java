@@ -5,14 +5,14 @@ import gnu.io.PortInUseException;
 import gnu.io.UnsupportedCommOperationException;
 
 import java.io.IOException;
-import us.hfgk.ardpicprog.ProgrammerPort.CommBuffer;
+import us.hfgk.ardpicprog.Programmer.CommBuffer;
 import us.hfgk.ardpicprog.pylike.Serial;
 import us.hfgk.ardpicprog.pylike.Serial.ByteSize;
 import us.hfgk.ardpicprog.pylike.Serial.Parity;
 import us.hfgk.ardpicprog.pylike.Serial.StopBits;
 import us.hfgk.ardpicprog.pylike.Str;
 
-public class RxTxProgrammerCommPort implements ProgrammerCommPort {
+public class RxTxProgrammerCommPort {
 	private Serial ser = null;
 
 	private static final int DEFAULT_TIMEOUT_MILLISECONDS = 3000;
@@ -109,10 +109,6 @@ public class RxTxProgrammerCommPort implements ProgrammerCommPort {
 			ser.close();
 			ser = null;
 		}
-	}
-
-	@Override
-	public void init() {
 	}
 
 }

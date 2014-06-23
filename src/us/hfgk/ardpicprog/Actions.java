@@ -12,7 +12,7 @@ import us.hfgk.ardpicprog.pylike.Str;
 public class Actions {
 	private static final Logger log = Logger.getLogger(Actions.class.getName());
 
-	static void doBurn(boolean forceCalibration, ProgrammerPort port, HexFile hexFile) throws IOException {
+	static void doBurn(boolean forceCalibration, Programmer port, HexFile hexFile) throws IOException {
 		hexFile.writeTo(port, forceCalibration);
 	}
 
@@ -22,7 +22,7 @@ public class Actions {
 		file.close();
 	}
 
-	static void doErase(boolean forceCalibration, ProgrammerPort port, HexFile hexFile) throws EraseException {
+	static void doErase(boolean forceCalibration, Programmer port, HexFile hexFile) throws EraseException {
 		if (forceCalibration) {
 			if (hexFile.canForceCalibration()) {
 				log.info("Erasing and removing code protection.");
@@ -44,11 +44,11 @@ public class Actions {
 		}
 	}
 
-	static void doListDevices(ProgrammerPort port) throws IOException {
+	static void doListDevices(Programmer port) throws IOException {
 		log.info("Supported devices:\n" + port.devices() + "* = autodetected");
 	}
 
-	static void doOutput(Str output, boolean skipOnes, ProgrammerPort port, HexFileMetadata hexMeta)
+	static void doOutput(Str output, boolean skipOnes, Programmer port, HexFileMetadata hexMeta)
 			throws IOException, HexFileException {
 		ShortList words = Common.getBlankShortList();
 		HexFile.readFrom(words, port.getShortSource(), hexMeta.getAreas());
@@ -70,7 +70,7 @@ public class Actions {
 		}
 	}
 
-	static void doBlankCheck(ProgrammerPort port, HexFileMetadata metadata) throws IOException {
+	static void doBlankCheck(Programmer port, HexFileMetadata metadata) throws IOException {
 		log.info("Checking whether device is blank");
 		if (HexFile.blankCheckRead(metadata, port.getShortSource())) {
 			log.info("Device appears to be blank");
@@ -79,11 +79,11 @@ public class Actions {
 		}
 	}
 
-	static ProgrammerPort getProgrammerPort(String port, int speed) throws IOException {
+	static Programmer getProgrammerPort(String port, int speed) throws IOException {
 		log.info("Initializing programmer on port " + port + " ...");
-		ProgrammerCommPort pcom = new RxTxProgrammerCommPort();
+		RxTxProgrammerCommPort pcom = new RxTxProgrammerCommPort();
 		pcom.open(port, speed);
-		ProgrammerPort prog = new ProgrammerPort(pcom);
+		Programmer prog = new Programmer(pcom);
 		return prog;
 	}
 

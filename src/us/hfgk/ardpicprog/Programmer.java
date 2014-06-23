@@ -12,9 +12,9 @@ import us.hfgk.ardpicprog.pylike.Po;
 import us.hfgk.ardpicprog.pylike.Serial;
 import us.hfgk.ardpicprog.pylike.Str;
 
-public class ProgrammerPort implements Closeable {
+public class Programmer implements Closeable {
 
-	private static final Logger log = Logger.getLogger(ProgrammerPort.class.getName());
+	private static final Logger log = Logger.getLogger(Programmer.class.getName());
 
 	private static final int BINARY_WORD_TRANSFER_MAX = 32;
 
@@ -35,7 +35,7 @@ public class ProgrammerPort implements Closeable {
 			return Po.len(buffer);
 		}
 
-		private int readProgrammerByte(ProgrammerPort src) throws IOException {
+		private int readProgrammerByte(Programmer src) throws IOException {
 			if (pos >= Po.len(buffer)) {
 				if (!src.com.fillBuffer(this))
 					return -1;
@@ -44,13 +44,12 @@ public class ProgrammerPort implements Closeable {
 		}
 	}
 
-	private ProgrammerCommPort com = null;
+	private RxTxProgrammerCommPort com = null;
 
 	private CommBuffer buff = new CommBuffer();
 
-	ProgrammerPort(ProgrammerCommPort com) throws IOException {
+	Programmer(RxTxProgrammerCommPort com) throws IOException {
 		this.com = com;
-		com.init();
 		com.setReceiveTimeout(1000);
 		boolean versionCompatible = pollVersion(0);
 		if (!versionCompatible)
@@ -367,20 +366,20 @@ public class ProgrammerPort implements Closeable {
 	}
 
 	private static class PortBlockIO implements ShortSink, ShortSource {
-		private ProgrammerPort port;
+		private Programmer port;
 		private boolean forceCalibration;
 
-		PortBlockIO(ProgrammerPort port) {
+		PortBlockIO(Programmer port) {
 			this(port, false);
 		}
 
-		PortBlockIO(ProgrammerPort port, boolean forceCalibration) {
+		PortBlockIO(Programmer port, boolean forceCalibration) {
 			this.port = port;
 			this.forceCalibration = forceCalibration;
 		}
 
 		public void writeFrom(IntRange range, short[] data, int offset) throws IOException {
-			ByteArrayOutputStream buffer = new ByteArrayOutputStream(ProgrammerPort.BINARY_WORD_TRANSFER_MAX * 2 + 1);
+			ByteArrayOutputStream buffer = new ByteArrayOutputStream(Programmer.BINARY_WORD_TRANSFER_MAX * 2 + 1);
 			int wordlen = (range.size());
 
 			if (wordlen == 5) {
@@ -391,11 +390,11 @@ public class ProgrammerPort implements Closeable {
 			}
 
 			port.commandWriteBin(range.start(), forceCalibration);
-			while (wordlen >= ProgrammerPort.BINARY_WORD_TRANSFER_MAX) {
-				port.bufferWords(data, offset, ProgrammerPort.BINARY_WORD_TRANSFER_MAX, buffer);
+			while (wordlen >= Programmer.BINARY_WORD_TRANSFER_MAX) {
+				port.bufferWords(data, offset, Programmer.BINARY_WORD_TRANSFER_MAX, buffer);
 				port.writePacketAndClear(buffer);
-				offset += ProgrammerPort.BINARY_WORD_TRANSFER_MAX;
-				wordlen -= ProgrammerPort.BINARY_WORD_TRANSFER_MAX;
+				offset += Programmer.BINARY_WORD_TRANSFER_MAX;
+				wordlen -= Programmer.BINARY_WORD_TRANSFER_MAX;
 			}
 			if (wordlen > 0) {
 				port.bufferWords(data, offset, wordlen, buffer);

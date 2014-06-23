@@ -299,7 +299,7 @@ public class App {
 				"    --erase --burn --force-calibration --list-devices --speed SPEED");
 	}
 
-	private ProgrammerPort findPort(Iterable<String> ports, int speed) throws IOException {
+	private Programmer findPort(Iterable<String> ports, int speed) throws IOException {
 		for(String port : ports) {
 			try {
 				return Actions.getProgrammerPort(port, speed);
@@ -319,7 +319,7 @@ public class App {
 	
 	private void runWithOptions(Options options) throws IOException, FileNotFoundException {
 		// Try to open the serial port and initialize the programmer.
-		ProgrammerPort port = null;
+		Programmer port = null;
 
 		try {
 			port = findPort(options.ports, options.speed);

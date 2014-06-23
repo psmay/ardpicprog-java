@@ -157,7 +157,7 @@ public class HexFile {
 		HexFileSerializer.saveCC(this, file, skipOnes);
 	}
 
-	public void writeTo(ProgrammerPort port, boolean forceCalibration) throws IOException {
+	public void writeTo(Programmer port, boolean forceCalibration) throws IOException {
 		writeTo(port.getShortSink(forceCalibration), forceCalibration);
 	}
 
