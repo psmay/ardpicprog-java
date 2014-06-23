@@ -5,7 +5,6 @@ import gnu.io.PortInUseException;
 import gnu.io.UnsupportedCommOperationException;
 
 import java.io.IOException;
-import us.hfgk.ardpicprog.Programmer.CommBuffer;
 import us.hfgk.ardpicprog.pylike.Serial;
 import us.hfgk.ardpicprog.pylike.Serial.ByteSize;
 import us.hfgk.ardpicprog.pylike.Serial.Parity;
@@ -30,17 +29,13 @@ public class ProgrammerCommPort {
 	public ProgrammerCommPort(int timeoutMs) {
 		this.timeoutMs = timeoutMs;
 	}
-
-	public void write(byte[] data, int offset, int length) throws IOException {
-		write(Str.val(data, offset, length));
-	}
 	
 	public void write(Str data) throws IOException {
 		ser.write(data);
 	}
 
-	public boolean fillBuffer(CommBuffer buff) throws IOException {
-		return buff.fillFrom(ser) > 0;
+	public boolean fillBuffer(Programmer pgm) throws IOException {
+		return pgm.fillFrom(ser) > 0;
 	}
 
 	public void open(String port, int speed) throws IOException {

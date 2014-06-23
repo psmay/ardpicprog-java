@@ -22,31 +22,29 @@ public class Programmer implements Closeable {
 
 	private static final Str DETAIL_DEVICE_NAME = Str.val("DeviceName");
 
-	public static class CommBuffer {
-		private int pos = 0;
-		private Str buffer = Str.EMPTY;
+	
+	private int bufferPos = 0;
+	private Str buffer = Str.EMPTY;
+	
+	int fillFrom(Serial in) throws IOException {
+		buffer = in.read(1024);
+		bufferPos = 0;
 
-		int fillFrom(Serial in) throws IOException {
-			buffer = in.read(1024);
-			pos = 0;
-
-			if (buffer.equals(Str.EMPTY))
-				return -1;
-			return Po.len(buffer);
-		}
-
-		private int readProgrammerByte(Programmer src) throws IOException {
-			if (pos >= Po.len(buffer)) {
-				if (!src.com.fillBuffer(this))
-					return -1;
-			}
-			return Po.getitem(buffer, pos++) & 0xFF;
-		}
+		if (buffer.equals(Str.EMPTY))
+			return -1;
+		return Po.len(buffer);
 	}
+	
+	private int readProgrammerByte() throws IOException {
+		if (bufferPos >= Po.len(buffer)) {
+			if (!com.fillBuffer(this))
+				return -1;
+		}
+		return Po.getitem(buffer, bufferPos++) & 0xFF;
+	}
+	
 
 	private ProgrammerCommPort com = null;
-
-	private CommBuffer buff = new CommBuffer();
 
 	Programmer(ProgrammerCommPort com) throws IOException {
 		this.com = com;
@@ -193,10 +191,6 @@ public class Programmer implements Closeable {
 			data[offset++] = (byte) (0xFF & ch);
 			--length;
 		}
-	}
-
-	private int readProgrammerByte() throws IOException {
-		return buff.readProgrammerByte(this);
 	}
 
 	private Str readProgrammerLine() throws IOException {
