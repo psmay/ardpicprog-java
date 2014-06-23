@@ -3,7 +3,6 @@ package us.hfgk.ardpicprog;
 import java.io.ByteArrayOutputStream;
 import java.io.Closeable;
 import java.io.IOException;
-import java.io.OutputStream;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
@@ -18,17 +17,19 @@ public class ProgrammerPort implements Closeable {
 
 	private static final int BINARY_WORD_TRANSFER_MAX = 32;
 
+	private static final Str TERM_PACKET = Str.val(new byte[] { 0x00 }, 0, 1);
+
 	public static class CommBuffer {
 		private int pos = 0;
 		private Str buffer = Str.EMPTY;
-		
+
 		int fillFrom(Serial in) throws IOException {
 			buffer = in.read(1024);
 			pos = 0;
-			
-			if(buffer.equals(Str.EMPTY))
+
+			if (buffer.equals(Str.EMPTY))
 				return -1;
-			return Po.len(buffer);			
+			return Po.len(buffer);
 		}
 
 		private int readProgrammerByte(ProgrammerPort src) throws IOException {
@@ -170,7 +171,7 @@ public class ProgrammerPort implements Closeable {
 	}
 
 	private void writeString(String str) throws IOException {
-		//FIXME
+		// FIXME
 		com.write(Str.val(str));
 	}
 
@@ -280,21 +281,23 @@ public class ProgrammerPort implements Closeable {
 		}
 	}
 
-	private final PacketOutputStream packetOutputStream = new PacketOutputStream(this);
-
 	private static Str getStrFromJavaBaos(ByteArrayOutputStream os) {
 		byte[] b = os.toByteArray();
 		return Str.val(b, 0, b.length);
 	}
-	
+
 	private void writePacketAndClear(ByteArrayOutputStream os) throws IOException {
 		Str s = getStrFromJavaBaos(os);
-		packetOutputStream.write(s);
+		writePacket(s);
 		os.reset();
 	}
 
-	private void writePacket(byte[] packet, int len) throws IOException {
-		packetOutputStream.write(packet, 0, len);
+	private void writePacket(Str s) throws IOException, PacketResponseException {
+		log.finest("Writing " + Po.len(s) + " byte(s) as packet");
+		this.com.write(s);
+		String response = this.readProgrammerLine();
+		if (!response.equals("OK"))
+			throw new PacketResponseException("Packet response was '" + response + "'; expected 'OK'");
 	}
 
 	private void commandDevice() throws IOException {
@@ -334,41 +337,14 @@ public class ProgrammerPort implements Closeable {
 		command("WRITE " + (force ? "FORCE " : "") + Common.toX4(" ", (short) start) + " " + Common.toX4(" ", values));
 	}
 
-	private static final class PacketOutputStream extends OutputStream {
-		private final ProgrammerPort port;
-
-		private PacketOutputStream(ProgrammerPort port) {
-			this.port = port;
-		}
-
-		@Override
-		public void write(int b) throws IOException {
-			write(new byte[] { (byte) b });
-		}
-
-		public void write(Str data) throws IOException {
-			log.finest("Writing " + Po.len(data) + " byte(s) as packet");
-			port.com.write(data);
-			String response = port.readProgrammerLine();
-			if (!response.equals("OK"))
-				throw new PacketResponseException("Packet response was '" + response + "'; expected 'OK'");
-		}
-		
-		@Override
-		@Deprecated
-		public void write(byte[] b, int off, int len) throws IOException {
-			write(Str.val(b, off, len));
-		}
-	}
-	
 	ShortSource getShortSource() {
 		return new PortBlockIO(this);
 	}
-	
+
 	ShortSink getShortSink(boolean forceCalibration) {
 		return new PortBlockIO(this, forceCalibration);
 	}
-	
+
 	private static class PortBlockIO implements ShortSink, ShortSource {
 		private ProgrammerPort port;
 		private boolean forceCalibration;
@@ -385,14 +361,14 @@ public class ProgrammerPort implements Closeable {
 		public void writeFrom(IntRange range, short[] data, int offset) throws IOException {
 			ByteArrayOutputStream buffer = new ByteArrayOutputStream(ProgrammerPort.BINARY_WORD_TRANSFER_MAX * 2 + 1);
 			int wordlen = (range.size());
-			
+
 			if (wordlen == 5) {
 				// Cannot use "WRITEBIN" for exactly 10 bytes, so use "WRITE"
 				// instead.
-			
+
 				port.commandWrite(range.start(), forceCalibration, Arrays.copyOfRange(data, 0, 5));
 			}
-			
+
 			port.commandWriteBin(range.start(), forceCalibration);
 			while (wordlen >= ProgrammerPort.BINARY_WORD_TRANSFER_MAX) {
 				port.bufferWords(data, offset, ProgrammerPort.BINARY_WORD_TRANSFER_MAX, buffer);
@@ -404,18 +380,18 @@ public class ProgrammerPort implements Closeable {
 				port.bufferWords(data, offset, wordlen, buffer);
 				port.writePacketAndClear(buffer);
 			}
-			
+
 			// Terminating packet.
-			port.writePacket(new byte[] { 0x00 }, 1);
+			port.writePacket(TERM_PACKET);
 		}
 
 		@Override
 		public void readTo(IntRange range, short[] data, int offset) throws IOException {
 			int current = range.start();
 			byte[] buffer = new byte[256];
-			
+
 			port.commandReadBin(range);
-			
+
 			while (current < range.post()) {
 				int pktlen = port.readProgrammerByte();
 				if (pktlen < 0)
