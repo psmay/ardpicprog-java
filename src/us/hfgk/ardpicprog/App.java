@@ -2,9 +2,12 @@ package us.hfgk.ardpicprog;
 
 import gnu.getopt.Getopt;
 import gnu.getopt.LongOpt;
+import gnu.io.NoSuchPortException;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -17,7 +20,7 @@ public class App {
 		public boolean blankCheck = false;
 		boolean quiet = false;
 		String device;
-		String port;
+		List<String> ports = new ArrayList<String>();
 		String input;
 		String output;
 		String ccOutput;
@@ -31,14 +34,14 @@ public class App {
 		int speed = 9600;
 
 		public Options() {
-			String env;
+			//String env;
 
-			env = System.getenv("PIC_DEVICE");
-			if (!Common.stringEmpty(env))
-				device = env;
+			//env = System.getenv("PIC_DEVICE");
+			//if (!Common.stringEmpty(env))
+			//	device = env;
 
-			env = System.getenv("PIC_PORT");
-			port = Common.stringEmpty(env) ? "" : env;
+			//env = System.getenv("PIC_PORT");
+			//ports = Common.stringEmpty(env) ? "" : env;
 		}
 
 		public static final char BURN = 'b';
@@ -217,7 +220,7 @@ public class App {
 				break;
 			case Options.PROGRAMMER_PORT:
 				// Set the serial port to use to access the programmer.
-				options.port = g.getOptarg();
+				options.ports.add(g.getOptarg());
 				break;
 			case Options.QUIET:
 				// Enable quiet mode.
@@ -294,12 +297,30 @@ public class App {
 				"    --erase --burn --force-calibration --list-devices --speed SPEED");
 	}
 
+	private ProgrammerPort findPort(Iterable<String> ports, int speed) throws IOException {
+		for(String port : ports) {
+			try {
+				return Actions.getProgrammerPort(port, speed);
+			}
+			catch(PortSetupException pse) {
+				if(pse.getCause() instanceof NoSuchPortException) {
+					log.warning("Could not open nonexistent port " + port);
+					// And try the next
+				}
+				else {
+					throw pse;
+				}
+			}
+		}
+		throw new PortSetupException("None of the specified ports are available");
+	}
+	
 	private void runWithOptions(Options options) throws IOException, FileNotFoundException {
 		// Try to open the serial port and initialize the programmer.
 		ProgrammerPort port = null;
 
 		try {
-			port = Actions.getProgrammerPort(options.port, options.speed);
+			port = findPort(options.ports, options.speed);
 
 			// Does the user want to list the available devices?
 			if (options.listDevices) {

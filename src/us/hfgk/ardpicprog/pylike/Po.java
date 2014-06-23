@@ -18,4 +18,7 @@ public class Po {
 		return PylikeFile.wrapJavaStream(new FileOutputStream(filename.toString()));
 	}
 
+	public static byte getitem(Str value, int i) {
+		return value.oPgetitem(i);
+	}
 }

@@ -213,5 +213,13 @@ public final class Str {
 		return length();
 	}
 
+	public byte oPgetitem(int i) {
+		if(i < 0)
+			i += length();
+		if((i < 0) || (i >= length()))
+			throw new IndexOutOfBoundsException();
+		return value[i];
+	}
+
 
 }

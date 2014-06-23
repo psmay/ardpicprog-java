@@ -4,6 +4,7 @@ import java.io.Closeable;
 import java.io.IOException;
 
 import us.hfgk.ardpicprog.ProgrammerPort.CommBuffer;
+import us.hfgk.ardpicprog.pylike.Str;
 
 public interface ProgrammerCommPort extends Closeable {
 	@Override
@@ -21,5 +22,8 @@ public interface ProgrammerCommPort extends Closeable {
 
 	void setReceiveTimeout(int ms) throws PortSetupException;
 
+	void write(Str data) throws IOException;
+	
+	@Deprecated
 	void write(byte[] data, int offset, int length) throws IOException;
 }

@@ -76,11 +76,11 @@ public class Actions {
 	}
 
 	static ProgrammerPort getProgrammerPort(String port, int speed) throws IOException {
-		log.info("Initializing programmer ...");
-		ProgrammerCommPort sp = new RxTxProgrammerCommPort();
-		sp.open(port, speed);
-		ProgrammerPort pp = new ProgrammerPort(sp);
-		return pp;
+		log.info("Initializing programmer on port " + port + " ...");
+		ProgrammerCommPort pcom = new RxTxProgrammerCommPort();
+		pcom.open(port, speed);
+		ProgrammerPort prog = new ProgrammerPort(pcom);
+		return prog;
 	}
 
 	static void describeHexFileDevice(HexFileMetadata metadata) {

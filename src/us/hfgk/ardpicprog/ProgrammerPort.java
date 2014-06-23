@@ -3,12 +3,15 @@ package us.hfgk.ardpicprog;
 import java.io.ByteArrayOutputStream;
 import java.io.Closeable;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.logging.Logger;
+
+import us.hfgk.ardpicprog.pylike.Po;
+import us.hfgk.ardpicprog.pylike.Serial;
+import us.hfgk.ardpicprog.pylike.Str;
 
 public class ProgrammerPort implements Closeable {
 	private static final Logger log = Logger.getLogger(ProgrammerPort.class.getName());
@@ -16,28 +19,24 @@ public class ProgrammerPort implements Closeable {
 	private static final int BINARY_WORD_TRANSFER_MAX = 32;
 
 	public static class CommBuffer {
-		private int buflen = 0;
-		private int bufposn = 0;
-		private byte[] buffer = new byte[1024];
-
-		int fillFrom(InputStream in) throws IOException {
-			int bytesRead;
-
-			buflen = 0;
-			bufposn = 0;
-
-			bytesRead = in.read(buffer);
-			buflen = bytesRead;
-
-			return bytesRead;
+		private int pos = 0;
+		private Str buffer = Str.EMPTY;
+		
+		int fillFrom(Serial in) throws IOException {
+			buffer = in.read(1024);
+			pos = 0;
+			
+			if(buffer.equals(Str.EMPTY))
+				return -1;
+			return Po.len(buffer);			
 		}
 
 		private int readProgrammerByte(ProgrammerPort src) throws IOException {
-			if (bufposn >= buflen) {
+			if (pos >= Po.len(buffer)) {
 				if (!src.com.fillBuffer(this))
 					return -1;
 			}
-			return buffer[bufposn++] & 0xFF;
+			return Po.getitem(buffer, pos++) & 0xFF;
 		}
 	}
 
@@ -171,8 +170,8 @@ public class ProgrammerPort implements Closeable {
 	}
 
 	private void writeString(String str) throws IOException {
-		byte[] bytes = Common.getBytes(str);
-		com.write(bytes, 0, bytes.length);
+		//FIXME
+		com.write(Str.val(str));
 	}
 
 	// Returns a list of the available devices.
@@ -283,8 +282,14 @@ public class ProgrammerPort implements Closeable {
 
 	private final PacketOutputStream packetOutputStream = new PacketOutputStream(this);
 
+	private static Str getStrFromJavaBaos(ByteArrayOutputStream os) {
+		byte[] b = os.toByteArray();
+		return Str.val(b, 0, b.length);
+	}
+	
 	private void writePacketAndClear(ByteArrayOutputStream os) throws IOException {
-		os.writeTo(packetOutputStream);
+		Str s = getStrFromJavaBaos(os);
+		packetOutputStream.write(s);
 		os.reset();
 	}
 
@@ -341,13 +346,18 @@ public class ProgrammerPort implements Closeable {
 			write(new byte[] { (byte) b });
 		}
 
-		@Override
-		public void write(byte[] b, int off, int len) throws IOException {
-			log.finest("Writing " + len + " byte(s) as packet");
-			port.com.write(b, off, len);
+		public void write(Str data) throws IOException {
+			log.finest("Writing " + Po.len(data) + " byte(s) as packet");
+			port.com.write(data);
 			String response = port.readProgrammerLine();
 			if (!response.equals("OK"))
 				throw new PacketResponseException("Packet response was '" + response + "'; expected 'OK'");
+		}
+		
+		@Override
+		@Deprecated
+		public void write(byte[] b, int off, int len) throws IOException {
+			write(Str.val(b, off, len));
 		}
 	}
 	

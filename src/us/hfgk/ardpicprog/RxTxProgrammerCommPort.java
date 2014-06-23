@@ -1,22 +1,19 @@
 package us.hfgk.ardpicprog;
 
-import gnu.io.CommPortIdentifier;
 import gnu.io.NoSuchPortException;
 import gnu.io.PortInUseException;
-import gnu.io.SerialPort;
 import gnu.io.UnsupportedCommOperationException;
 
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
-
 import us.hfgk.ardpicprog.ProgrammerPort.CommBuffer;
+import us.hfgk.ardpicprog.pylike.Serial;
+import us.hfgk.ardpicprog.pylike.Serial.ByteSize;
+import us.hfgk.ardpicprog.pylike.Serial.Parity;
+import us.hfgk.ardpicprog.pylike.Serial.StopBits;
+import us.hfgk.ardpicprog.pylike.Str;
 
 public class RxTxProgrammerCommPort implements ProgrammerCommPort {
-	private SerialPort serialPort = null;
-	private int timeoutValue = 5000;
-	private OutputStream out;
-	private InputStream in;
+	private Serial ser = null;
 
 	private static final int DEFAULT_TIMEOUT_MILLISECONDS = 3000;
 
@@ -35,15 +32,19 @@ public class RxTxProgrammerCommPort implements ProgrammerCommPort {
 	}
 
 	public void write(byte[] data, int offset, int length) throws IOException {
-		out.write(data, offset, length);
+		write(Str.val(data, offset, length));
+	}
+	
+	public void write(Str data) throws IOException {
+		ser.write(data);
 	}
 
 	public boolean fillBuffer(CommBuffer buff) throws IOException {
-		return buff.fillFrom(in) > 0;
+		return buff.fillFrom(ser) > 0;
 	}
 
 	public void open(String port, int speed) throws IOException {
-		if (serialPort != null)
+		if (ser != null)
 			throw new PortSetupException("Programmer comm port already open");
 
 		if (Common.stringEmpty(port))
@@ -52,17 +53,22 @@ public class RxTxProgrammerCommPort implements ProgrammerCommPort {
 		boolean ok = false;
 
 		try {
-			CommPortIdentifier portId = CommPortIdentifier.getPortIdentifier(port);
-
-			serialPort = (SerialPort) portId.open("ardpicprog-java", timeoutValue);
-			serialPort.setSerialPortParams(speed, SerialPort.DATABITS_8, SerialPort.STOPBITS_1, SerialPort.PARITY_NONE);
-			serialPort.setFlowControlMode(SerialPort.FLOWCONTROL_NONE);
-			serialPort.setDTR(true);
-			serialPort.setRTS(true);
-			out = serialPort.getOutputStream();
-			in = serialPort.getInputStream();
-			serialPort.enableReceiveThreshold(1);
-			serialPort.enableReceiveTimeout(1000);
+			Serial.Params params = new Serial.Params();
+			params.port = port;
+			params.baudrate = speed;
+			params.bytesize = ByteSize.EIGHTBITS;
+			params.stopbits = StopBits.STOPBITS_ONE;
+			params.parity = Parity.PARITY_NONE;
+			params.xonxoff = false;
+			params.rtscts = false;
+			params.dsrdtr = false;
+			
+			ser = Serial.serial(params);
+			
+			ser.setDTR();
+			ser.setRTS();
+			
+			ser.timeout(1000);
 			ok = true;
 		} catch (NoSuchPortException e) {
 			throw new PortSetupException(port + ": No such port", e);
@@ -72,20 +78,18 @@ public class RxTxProgrammerCommPort implements ProgrammerCommPort {
 			throw new PortSetupException(port + ": Port settings not supported", e);
 		} finally {
 			if (!ok) {
-				if (serialPort != null) {
-					serialPort.close();
-					serialPort = null;
+				if (ser != null) {
+					ser.close();
+					ser = null;
 				}
-				out = null;
-				in = null;
 			}
 		}
 	}
 
 	public void setReceiveTimeout(int milliseconds) throws PortSetupException {
-		if (serialPort != null)
+		if (ser != null)
 			try {
-				serialPort.enableReceiveTimeout(milliseconds);
+				ser.timeout(milliseconds);
 			} catch (UnsupportedCommOperationException e) {
 				throw new PortSetupException("Changing the timeout is not supported on this port", e);
 			}
@@ -93,19 +97,17 @@ public class RxTxProgrammerCommPort implements ProgrammerCommPort {
 	}
 
 	public int getReceiveTimeout() {
-		return (serialPort == null) ? timeoutMs : serialPort.getReceiveTimeout();
+		return (ser == null) ? timeoutMs : ser.timeout();
 	}
 
 	public boolean isStillOpen() {
-		return serialPort != null;
+		return ser != null;
 	}
 
 	public void close() throws IOException {
-		if (serialPort != null) {
-			serialPort.close();
-			serialPort = null;
-			out = null;
-			in = null;
+		if (ser != null) {
+			ser.close();
+			ser = null;
 		}
 	}
 
