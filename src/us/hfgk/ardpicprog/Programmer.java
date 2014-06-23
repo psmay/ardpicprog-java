@@ -9,7 +9,6 @@ import java.util.Map;
 import java.util.logging.Logger;
 
 import us.hfgk.ardpicprog.pylike.Po;
-import us.hfgk.ardpicprog.pylike.Serial;
 import us.hfgk.ardpicprog.pylike.Str;
 
 public class Programmer implements Closeable {
@@ -22,27 +21,22 @@ public class Programmer implements Closeable {
 
 	private static final Str DETAIL_DEVICE_NAME = Str.val("DeviceName");
 
-	
 	private int bufferPos = 0;
 	private Str buffer = Str.EMPTY;
-	
-	int fillFrom(Serial in) throws IOException {
-		buffer = in.read(1024);
-		bufferPos = 0;
 
-		if (buffer.equals(Str.EMPTY))
-			return -1;
-		return Po.len(buffer);
-	}
-	
 	private int readProgrammerByte() throws IOException {
 		if (bufferPos >= Po.len(buffer)) {
-			if (!com.fillBuffer(this))
+			if(!fillBuffer())
 				return -1;
 		}
 		return Po.getitem(buffer, bufferPos++) & 0xFF;
 	}
-	
+
+	private boolean fillBuffer() throws IOException {
+		this.buffer = com.read(1024);
+		this.bufferPos = 0;
+		return !buffer.equals(Str.EMPTY);
+	}
 
 	private ProgrammerCommPort com = null;
 

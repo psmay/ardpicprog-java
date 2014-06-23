@@ -34,10 +34,6 @@ public class ProgrammerCommPort {
 		ser.write(data);
 	}
 
-	public boolean fillBuffer(Programmer pgm) throws IOException {
-		return pgm.fillFrom(ser) > 0;
-	}
-
 	public void open(String port, int speed) throws IOException {
 		if (ser != null)
 			throw new PortSetupException("Programmer comm port already open");
@@ -104,6 +100,10 @@ public class ProgrammerCommPort {
 			ser.close();
 			ser = null;
 		}
+	}
+
+	public Str read(int size) throws IOException {
+		return ser.read(size);
 	}
 
 }
