@@ -427,7 +427,9 @@ public class Programmer implements Closeable {
 			this.forceCalibration = forceCalibration;
 		}
 
-		public void writeFrom(AddressRange range, short[] data, int offset) throws IOException {
+		public void writeFrom(AddressRange range, short[] data) throws IOException {
+			int offset = 0;
+			
 			ByteArrayOutputStream buffer = new ByteArrayOutputStream(Programmer.BINARY_WORD_TRANSFER_MAX * 2 + 1);
 			int wordlen = (range.size());
 

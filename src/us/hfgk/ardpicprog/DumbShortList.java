@@ -97,7 +97,7 @@ public class DumbShortList implements ShortList {
 			Common.copyIntsToShortArray(buffer, range.start(), send, 0, range.size());
 
 			log.finest("Doing writeFrom for " + range + ", send buffer with length " + send.length + ", offset 0");
-			sink.writeFrom(range, send, 0);
+			sink.writeFrom(range, send);
 
 			actualCopiedCount += range.size();
 		}
