@@ -1,6 +1,7 @@
 package us.hfgk.ardpicprog.pylike;
 
 import java.util.Arrays;
+import java.util.List;
 
 public final class Str {
 	private final byte[] value;
@@ -84,6 +85,10 @@ public final class Str {
 
 	public Str join(Str... parts) {
 		return joinUsing(this, parts);
+	}
+
+	public Str join(List<Str> parts) {
+		return join(parts.toArray(new Str[0]));
 	}
 
 	public Str lower() {
@@ -254,5 +259,4 @@ public final class Str {
 			throw new IllegalArgumentException();
 		return 0xFF & value[0];
 	}
-
 }

@@ -3,8 +3,11 @@ package us.hfgk.ardpicprog;
 import java.io.ByteArrayOutputStream;
 import java.io.Closeable;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.logging.Logger;
 
@@ -12,6 +15,46 @@ import us.hfgk.ardpicprog.pylike.Po;
 import us.hfgk.ardpicprog.pylike.Str;
 
 public class Programmer implements Closeable {
+
+	private static final Str COMMAND_ARG_NOPRESERVE = Str.val("NOPRESERVE");
+
+	private static final Str COMMAND_READBIN = Str.val("READBIN");
+
+	private static final Str COMMAND_SETDEVICE = Str.val("SETDEVICE");
+
+	private static final Str COMMAND_WRITEBIN = Str.val("WRITEBIN");
+
+	private static final Str COMMAND_ARG_FORCE = Str.val("FORCE");
+
+	private static final Str COMMAND_WRITE = Str.val("WRITE");
+
+	private static final Str DOT = Str.val(".");
+
+	private static final Str RESPONSE_UNKNOWN_VERSION = Str.val("ProgramPIC ");
+
+	private static final Str RESPONSE_VERSION_1 = Str.val("ProgramPIC 1.");
+
+	private static final Str COMMAND_PROGRAM_PIC_VERSION = Str.val("PROGRAM_PIC_VERSION");
+
+	private static final Str DETAIL_DEVICE_ID = Str.val("DeviceID");
+
+	private static final Str SPACE = Str.val(" ");
+
+	private static final Str COMMAND_PWROFF = Str.val("PWROFF");
+
+	private static final Str COMMAND_ERASE = Str.val("ERASE");
+
+	private static final Str COMMAND_DEVICES = Str.val("DEVICES");
+
+	private static final Str COMMAND_DEVICE = Str.val("DEVICE");
+
+	private static final Str RESPONSE_PENDING = Str.val("PENDING");
+
+	private static final Str RESPONSE_OK = Str.val("OK");
+
+	private static final Str DEVICE_NAME_AUTO = Str.val("auto");
+
+	private static final Str DEVICE_ID_0000 = Str.val("0000");
 
 	private static final Logger log = Logger.getLogger(Programmer.class.getName());
 
@@ -26,7 +69,7 @@ public class Programmer implements Closeable {
 
 	private int readProgrammerByte() throws IOException {
 		if (bufferPos >= Po.len(buffer)) {
-			if(!fillBuffer())
+			if (!fillBuffer())
 				return -1;
 		}
 		return Po.getitem(buffer, bufferPos++) & 0xFF;
@@ -54,16 +97,16 @@ public class Programmer implements Closeable {
 			retry = 5;
 		while (retry > 0) {
 			log.fine("Requesting programmer version");
-			putln(Str.val("PROGRAM_PIC_VERSION"));
+			putln(COMMAND_PROGRAM_PIC_VERSION);
 			log.finest("Waiting for programmer version");
 			Str response = readProgrammerLine();
 			if (!response.equals(Str.EMPTY)) {
 				log.fine("Non-empty response: '" + response + "'");
-				if (response.startswith(Str.val("ProgramPIC 1."))) {
+				if (response.startswith(RESPONSE_VERSION_1)) {
 					// We've found a version 1 sketch, which we can talk to.
 					log.fine("Found recognized programmer version");
 					return true;
-				} else if (response.startswith(Str.val("ProgramPIC "))) {
+				} else if (response.startswith(RESPONSE_UNKNOWN_VERSION)) {
 					// Version 2 or higher sketch - cannot talk to this.
 					log.fine("Found incompatible programmer version");
 					return false;
@@ -99,15 +142,15 @@ public class Programmer implements Closeable {
 		Map<Str, Str> details = readDeviceInfo();
 
 		Str detailsDeviceName = details.get(DETAIL_DEVICE_NAME);
-		Str detailsDeviceID = details.get(Str.val("DeviceID"));
+		Str detailsDeviceID = details.get(DETAIL_DEVICE_ID);
 
 		if (detailsDeviceName != null) {
 
-			if (Common.strEmpty(deviceName) || deviceName.equals(Str.val("auto"))
+			if (Common.strEmpty(deviceName) || deviceName.equals(DEVICE_NAME_AUTO)
 					|| deviceNameMatch(deviceName, detailsDeviceName))
 				return details;
 
-			if (detailsDeviceID == null || !detailsDeviceID.equals(Str.val("0000"))) {
+			if (detailsDeviceID == null || !detailsDeviceID.equals(DEVICE_ID_0000)) {
 				throw new DeviceException("Expecting " + deviceName + " but found "
 						+ ((detailsDeviceID == null) ? "an unrecognized device" : detailsDeviceID)
 						+ " in the programmer");
@@ -116,13 +159,13 @@ public class Programmer implements Closeable {
 
 		// If the DeviceID is not "0000", then the device in the socket reports
 		// a device identifier, but it is not supported by the programmer.
-		if (detailsDeviceID != null && !detailsDeviceID.equals(Str.val("0000"))) {
+		if (detailsDeviceID != null && !detailsDeviceID.equals(DEVICE_ID_0000)) {
 			throw new DeviceException("Unsupported device in programmer, ID = " + detailsDeviceID);
 		}
 
 		// If the user wanted to auto-detect the device type, then fail now
 		// because we don't know what we have in the socket.
-		if (deviceName.equals(Str.EMPTY) || deviceName.equals(Str.val("auto"))) {
+		if (deviceName.equals(Str.EMPTY) || deviceName.equals(DEVICE_NAME_AUTO)) {
 			throw new DeviceException("Cannot autodetect: device in programmer does not have an identifier.");
 		}
 
@@ -151,7 +194,7 @@ public class Programmer implements Closeable {
 
 	// Sends a command to the sketch. Returns true if the response is "OK".
 	// Throws if the response is "ERROR" or a timeout occurred.
-	private void command(Str cmd) throws IOException {
+	private void commandAll(Str cmd) throws IOException {
 		log.fine("Command " + cmd + ": issuing");
 		putln(cmd);
 
@@ -161,11 +204,11 @@ public class Programmer implements Closeable {
 			log.finest("Command " + cmd + ": Reading result line");
 			response = readProgrammerLine();
 			log.finest("Command " + cmd + ": Read line '" + response + "'");
-		} while (response.equals(Str.val("PENDING"))); // int-running operation:
+		} while (response.equals(RESPONSE_PENDING)); // int-running operation:
 														// sketch
 		// has asked for a inter
 		// timeout.
-		if (!response.equals(Str.val("OK"))) {
+		if (!response.equals(RESPONSE_OK)) {
 			throw new CommandException("Response to command '" + cmd + "' not OK: '" + response + "'");
 		}
 		log.fine("Command " + cmd + ": Got OK response");
@@ -212,7 +255,7 @@ public class Programmer implements Closeable {
 		Str line;
 		for (;;) {
 			line = readProgrammerLine();
-			if (line == null || line.equals(Str.val(".")))
+			if (line == null || line.equals(DOT))
 				break;
 			response = response.pYappend(line).pYappend((byte) '\n');
 		}
@@ -229,7 +272,7 @@ public class Programmer implements Closeable {
 		for (;;) {
 			line = readProgrammerLine();
 			log.finest("Line is: '" + line + "'");
-			if (line == null || line.equals(Str.val(".")))
+			if (line == null || line.equals(DOT))
 				break;
 			int index = line.find((byte) ':');
 			if (index >= 0) {
@@ -276,73 +319,87 @@ public class Programmer implements Closeable {
 		log.finest("Writing " + Po.len(s) + " byte(s) as packet");
 		com.write(s);
 		Str response = this.readProgrammerLine();
-		if (!response.equals(Str.val("OK")))
+		if (!response.equals(RESPONSE_OK))
 			throw new PacketResponseException("Packet response was '" + response + "'; expected 'OK'");
 	}
 
 	private void commandDevice() throws IOException {
-		command(Str.val("DEVICE"));
+		command(COMMAND_DEVICE);
 	}
 
 	private void commandDevices() throws IOException {
-		command(Str.val("DEVICES"));
+		command(COMMAND_DEVICES);
 	}
 
 	void commandErase(boolean force) throws IOException {
+		ArrayList<Str> strs = new ArrayList<Str>();
+		strs.add(COMMAND_ERASE);
+		addNoPreserveArg(strs, force);
+		command(strs);
+	}
+
+	private void addNoPreserveArg(Collection<Str> strs, boolean force) {
 		if (force) {
-			command(Str.val("ERASE NOPRESERVE"));
-		} else {
-			command(Str.val("ERASE"));
+			strs.add(COMMAND_ARG_NOPRESERVE);
 		}
 	}
 
+	private void command(List<Str> strs) throws IOException {
+		commandAll(SPACE.join(strs));
+	}
+
+	private void command(Str... values) throws IOException {
+		command(Arrays.asList(values));
+	}
+
 	private void commandPwroff() throws IOException {
-		command(Str.val("PWROFF"));
+		command(COMMAND_PWROFF);
 	}
 
 	private void commandReadBin(AddressRange range) throws IOException {
-		command(Str.val("READBIN ").pYappend(hyphenateRange(range)));
-	}
-
-	private Str hyphenateRange(AddressRange range) {
-		return Str.val(hyphenateRangeJava(range));
-	}
-
-	private String hyphenateRangeJava(AddressRange range) {
-		return Common.toX4("-", (short) range.start(), (short) range.end());
+		command(COMMAND_READBIN, range.hexInclusive());
 	}
 
 	private Map<Str, Str> commandSetDevice(Str deviceName) throws IOException {
-		command(Str.val("SETDEVICE ").pYappend(deviceName));
+		command(COMMAND_SETDEVICE, deviceName);
 		return readDeviceInfo();
 	}
 
 	private void commandWriteBin(int start, boolean force) throws IOException {
-		command(Str.val("WRITEBIN ").pYappend(forceArg(force)).pYappend(hexStart(start)));
-	}
+		ArrayList<Str> strs = new ArrayList<Str>();
+		strs.add(COMMAND_WRITEBIN);
+		addForceArg(strs, force);
+		strs.add(Common.toX4Str(start));
 
-	private Str hexStart(int start) {
-		return Str.val(hexStartJava(start));
-	}
-
-	private String hexStartJava(int start) {
-		return Common.toX4(" ", (short) start);
-	}
-
-	private Str forceArg(boolean force) {
-		return force ? Str.val("FORCE ") : Str.EMPTY;
+		command(strs);
 	}
 
 	private void commandWrite(int start, boolean force, short... values) throws IOException {
-		command(Str.val("WRITE ").pYappend(forceArg(force)).pYappend(hexSpace(start, values)));
+		ArrayList<Str> strs = new ArrayList<Str>();
+		strs.add(COMMAND_WRITE);
+		addForceArg(strs, force);
+		strs.addAll(Common.toX4(asNumberList(start, values)));
+
+		command(strs);
 	}
 
-	private Str hexSpace(int start, short... values) {
-		return Str.val(hexSpaceJava(start, values));
+	private void addForceArg(Collection<Str> strs, boolean force) {
+		if (force) {
+			strs.add(COMMAND_ARG_FORCE);
+		}
 	}
 
-	private String hexSpaceJava(int start, short... values) {
-		return hexStart(start) + " " + Common.toX4(" ", values);
+	private static List<Number> asNumberList(int start, short... values) {
+		ArrayList<Number> numbers = new ArrayList<Number>(values.length + 1);
+		numbers.add(start);
+		addShortValues(numbers, values);
+		return numbers;
+	}
+
+	private static void addShortValues(Collection<Number> numbers, short... values) {
+		for (short value : values) {
+			numbers.add(value);
+		}
 	}
 
 	ShortSource getShortSource() {

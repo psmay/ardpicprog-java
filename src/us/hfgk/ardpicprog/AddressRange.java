@@ -1,6 +1,10 @@
 package us.hfgk.ardpicprog;
 
+import us.hfgk.ardpicprog.pylike.Str;
+
 class AddressRange {
+	private static final Str HYPHEN = Str.val("-");
+
 	private final int start;
 	private final int post;
 
@@ -55,6 +59,10 @@ class AddressRange {
 		return start >= post;
 	}
 
+	Str hexInclusive() {
+		return HYPHEN.join(Common.toX4(start(), end()));
+	}
+
 	// If this does not intersect that, the result is an empty range whose start
 	// is the greater of this start or that start.
 	AddressRange intersection(AddressRange that) {
@@ -84,4 +92,5 @@ class AddressRange {
 
 		return left + middle + right;
 	}
+
 }

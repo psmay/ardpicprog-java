@@ -2,10 +2,9 @@ package us.hfgk.ardpicprog;
 
 import java.io.Closeable;
 import java.io.IOException;
-import java.nio.charset.Charset;
-import java.nio.charset.UnsupportedCharsetException;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -14,45 +13,6 @@ import us.hfgk.ardpicprog.pylike.Str;
 
 abstract class Common {
 	private Common() {
-	}
-
-	static final Charset UTF8;
-
-	static {
-		try {
-			UTF8 = Charset.forName("UTF-8");
-		} catch (UnsupportedCharsetException e) {
-			throw new Error(e);
-		}
-	}
-
-	static byte[] getBytes(String data) {
-		return data.getBytes(UTF8);
-	}
-
-	private static String join(String sep, Object... values) {
-		final int length = values.length;
-		switch (length) {
-		case 0:
-			return "";
-		case 1:
-			return String.valueOf(values[0]);
-		default:
-			StringBuilder sb;
-			if (sep.length() > 0) {
-				sb = new StringBuilder(String.valueOf(values[0]));
-				for (int i = 1; i < length; ++i) {
-					sb.append(sep);
-					sb.append(String.valueOf(values[i]));
-				}
-			} else {
-				sb = new StringBuilder();
-				for (Object value : values) {
-					sb.append(String.valueOf(value));
-				}
-			}
-			return sb.toString();
-		}
 	}
 
 	static Integer parseHex(Str str) {
@@ -84,16 +44,33 @@ abstract class Common {
 		return sb.toString();
 	}
 
-	private static String toX4Once(int value) {
-		return Integer.toString(0x10000 | (value & 0xFFFF), 16).substring(1).toUpperCase();
+	public static List<Str> toX4(List<Number> values) {
+		return Arrays.asList(toX4(values.toArray(new Number[0])));
 	}
 
-	private static String[] toX4Array(short... values) {
-		String[] results = new String[values.length];
-		for (int i = 0; i < values.length; ++i) {
-			results[i] = toX4Once(values[i]);
+	public static Str[] toX4(Number... values) {
+		Str[] buffer = new Str[values.length];
+		int i = 0;
+		for (Number value : values) {
+			buffer[i++] = toX4Str(value.intValue());
 		}
-		return results;
+		return buffer;
+	}
+
+	public static Str[] toX4(Short... values) {
+		return toX4((Number[]) values);
+	}
+
+	public static Str[] toX4(Integer... values) {
+		return toX4((Number[]) values);
+	}
+
+	static Str toX4Str(int value) {
+		return Str.val(toX4Once(value));
+	}
+
+	private static String toX4Once(int value) {
+		return Integer.toString(0x10000 | (value & 0xFFFF), 16).substring(1).toUpperCase();
 	}
 
 	static short[] toShortArray(Collection<Short> numbers) {
@@ -111,10 +88,6 @@ abstract class Common {
 		if (buffer.length != i)
 			buffer = Arrays.copyOf(buffer, i);
 		return buffer;
-	}
-
-	static String toX4(String sep, short... values) {
-		return join(sep, (Object[]) toX4Array(values));
 	}
 
 	private static void linesToOut(String... lines) {
@@ -152,7 +125,7 @@ abstract class Common {
 	static boolean strEmpty(Str s) {
 		return (s == null) || s.equals(Str.EMPTY);
 	}
-	
+
 	static boolean stringEmpty(String s) {
 		return (s == null) || (s.isEmpty());
 	}
@@ -731,7 +704,5 @@ abstract class Common {
 			"an absolute waiver of all civil liability in connection with the",
 			"Program, unless a warranty or assumption of liability accompanies a",
 			"copy of the Program in return for a fee." };
-
-
 
 }
