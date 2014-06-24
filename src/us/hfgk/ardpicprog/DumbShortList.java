@@ -133,4 +133,9 @@ public class DumbShortList implements ShortList {
 		writeAt(range.start(), receive, 0, receive.length);
 	}
 
+	@Override
+	public void set(int index, short... values) {
+		writeAt(index, values, 0, values.length);		
+	}
+
 }
