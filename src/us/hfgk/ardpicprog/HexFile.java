@@ -130,9 +130,7 @@ public class HexFile {
 	}
 
 	private static boolean blankCheckFrom(HexFileMetadata metadata, ShortSource source, AddressRange range) throws IOException {
-		final short[] buf = new short[range.size()];
-
-		source.readTo(range, buf, 0);
+		final short[] buf = source.readCopy(range);
 
 		int i = range.start();
 		for (short word : buf) {			

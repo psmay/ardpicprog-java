@@ -220,14 +220,18 @@ public class Programmer implements Closeable {
 		return readMultiLineResponse();
 	}
 
-	private void read(byte[] data, int offset, int length) throws IOException {
+	private Str read(int length) throws IOException {
+		Str data = Str.EMPTY;
+
 		while (length > 0) {
 			int ch = readProgrammerByte();
 			if (ch == -1)
 				throw new EOFException();
-			data[offset++] = (byte) (0xFF & ch);
+			data = data.pYappend((byte) ch);
 			--length;
 		}
+
+		return data;
 	}
 
 	private Str readProgrammerLine() throws IOException {
@@ -451,31 +455,72 @@ public class Programmer implements Closeable {
 		}
 
 		@Override
-		public void readTo(AddressRange range, short[] data, int offset) throws IOException {
+		public short[] readCopy(AddressRange range) throws IOException {
+			int rangePost = range.post();
+			ArrayList<Short> data = new ArrayList<Short>(range.size());
+
 			int current = range.start();
-			byte[] buffer = new byte[256];
 
 			port.commandReadBin(range);
 
-			while (current < range.post()) {
+			while (current < rangePost) {
 				int pktlen = port.readProgrammerByte();
-				if (pktlen < 0)
+
+				if (pktlen < 0) {
 					throw new EOFException();
-				else if (pktlen == 0)
+				} else if (pktlen > 0) {
+					Str bytes = port.read(pktlen);
+					int numWords = min(rangePost - current, pktlen / 2);
+					addLittleWords(data, bytes, numWords);
+					current += numWords;
+				} else {
+					// pktlen == 0
 					break;
-				port.read(buffer, 0, pktlen);
-				int numWords = pktlen / 2;
-				if ((numWords) > (range.post() - current))
-					numWords = range.post() - current;
-				for (int index = 0; index < numWords; ++index) {
-					data[offset + index] = (short) ((buffer[index * 2] & 0xFF) | ((buffer[index * 2 + 1] & 0xFF) << 8));
 				}
-				offset += numWords;
-				current += numWords;
 			}
-			if (current < range.post()) {
+			if (current < rangePost) {
 				throw new ProgrammerException("Could not fill entire buffer");
 			}
+			return toPrimitiveArray(data);
+		}
+
+		private static final short[] toPrimitiveArray(List<Short> data) {
+			short[] output = new short[data.size()];
+			int actualCount = 0;
+
+			for (short z : data) {
+				++actualCount;
+				if (actualCount > output.length) {
+					output = Arrays.copyOf(output, actualCount);
+				}
+				output[actualCount - 1] = z;
+			}
+
+			if (actualCount > output.length) {
+				output = Arrays.copyOf(output, actualCount);
+			}
+
+			return output;
+		}
+
+		private void addLittleWords(List<Short> dest, Str src, int wordCount) {
+			for (int byteIndex : Po.xrange(0, 2 * wordCount, 2)) {
+				dest.add(getLittleWord(src, byteIndex));
+			}
+		}
+
+		private static final short getLittleWord(Str str, int index) {
+			return bytesToWord(Po.getitem(str, index + 1), Po.getitem(str, index));
+		}
+
+		private static final short bytesToWord(byte hiByte, byte loByte) {
+			int lo = (loByte & 0xFF);
+			int hi = (hiByte & 0xFF) << 8;
+			return (short) (lo | hi);
+		}
+
+		private static final int min(int a, int b) {
+			return (a < b) ? a : b;
 		}
 	}
 

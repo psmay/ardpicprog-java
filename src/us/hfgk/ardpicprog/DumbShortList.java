@@ -128,8 +128,7 @@ public class DumbShortList implements ShortList {
 	@Override
 	public void readFrom(ShortSource source, AddressRange range) throws IOException {
 		log.finest("Set indices " + range + " from source");
-		short[] receive = new short[range.size()];
-		source.readTo(range, receive, 0);
+		short[] receive = source.readCopy(range);
 		writeAt(range.start(), receive, 0, receive.length);
 	}
 
