@@ -14,36 +14,31 @@ class HexFileParser {
 	private static final int RECORD_START_SEGMENT_ADDRESS = 0x03;
 	private static final int RECORD_EXTENDED_LINEAR_ADDRESS = 0x04;
 	private static final int RECORD_START_LINEAR_ADDRESS = 0x05;
-	
+
 	// Dummy base address to express that reading record was successful
 	private static final int READ_RECORD_OK = 0x7FFFFFFF;
-	
+
 	private static int DIGIT_COLON = 0x10;
 
 	private static void copyLineToWords(ShortList words, byte[] line, int wordAddress) {
-		int lineSizeMinus5 = line.length - 5;
-		for (int wordIndex = 0; (wordIndex << 1) < lineSizeMinus5; ++wordIndex) {
-			words.set(wordAddress + wordIndex, readLittleWord(line, (wordIndex << 1) + 4));
+		for (int byteIndex : Po.xrange(0, line.length - 5, 2)) {
+			int wordIndex = byteIndex >> 1;
+			words.set(wordAddress + wordIndex, readLittleWord(line, byteIndex + 4));
 		}
 	}
-	
-	private static int examineDigit(int ch) {
-		if (ch == ':') {
+
+	private static int examineDigit(Str s) {
+		if (s.equals(Str.val(":")))
 			return DIGIT_COLON;
-		} else if (ch >= '0' && ch <= '9') {
-			return ch - '0';
-		} else if (ch >= 'A' && ch <= 'F') {
-			return ch - 'A' + 10;
-		} else if (ch >= 'a' && ch <= 'f') {
-			return ch - 'a' + 10;
-		} else {
-			// Invalid character in hex file.
+		try {
+			return Po.int_(s, 16);
+		} catch (NumberFormatException e) {
 			return -1;
 		}
 	}
 
 	public static HexFile load(HexFileMetadata details, PylikeReadable file) throws IOException {
-		if(details == null)
+		if (details == null)
 			throw new IllegalArgumentException();
 		ShortList words = Common.getBlankShortList();
 		loadIntoShortList(words, file);
@@ -59,14 +54,14 @@ class HexFileParser {
 		int baseAddress = 0;
 
 		Str chstr;
-		
+
 		while (!(chstr = file.read(1)).equals(Str.EMPTY)) {
-			//ch = 0xFF & Po.getitem(chstr, 0);
-			
-			if(chstr.equals(Str.val(" ")) || chstr.equals(Str.val("\t")))
+			// ch = 0xFF & Po.getitem(chstr, 0);
+
+			if (chstr.equals(Str.val(" ")) || chstr.equals(Str.val("\t")))
 				continue;
 
-			if(chstr.equals(Str.val("\r")) || chstr.equals(Str.val("\n"))) {
+			if (chstr.equals(Str.val("\r")) || chstr.equals(Str.val("\n"))) {
 				if (nibble != -1) {
 					// Half a byte at the end of the line.
 					throw new HexFileException("Half byte at end of line");
@@ -87,7 +82,7 @@ class HexFileParser {
 				continue;
 			}
 
-			digit = examineDigit(Po.ord(chstr));
+			digit = examineDigit(chstr);
 
 			if (digit == DIGIT_COLON) {
 				if (!startLine) {
@@ -117,7 +112,6 @@ class HexFileParser {
 
 		throw new HexFileException("Unexpected end of input");
 	}
-	
 
 	// Read a big-endian word value from a buffer.
 	private static short readBigWord(byte[] bytes, int index) {
@@ -128,7 +122,6 @@ class HexFileParser {
 	private static short readLittleWord(byte[] bytes, int index) {
 		return shortFromBytes(bytes[index + 1], bytes[index]);
 	}
-	
 
 	private static int readRecord(ShortList words, byte[] line, int baseAddress) throws HexFileException {
 
@@ -176,7 +169,6 @@ class HexFileParser {
 			throw new HexFileException("Invalid record type");
 		}
 	}
-	
 
 	private static short shortFromBytes(byte high, byte low) {
 		return (short) (((high & 0xFF) << 8) | (low & 0xFF));

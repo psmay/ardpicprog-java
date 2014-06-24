@@ -32,6 +32,10 @@ public final class Str {
 		this.value = Arrays.copyOfRange(noncaptive, off, off + len);
 	}
 
+	public static Str val(byte... value) {
+		return val(value, 0, value.length);
+	}
+	
 	public static Str val(byte[] buffer, int off, int len) {
 		return new Str(buffer, off, len);
 	}
