@@ -5,8 +5,6 @@ import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.util.AbstractList;
 import java.util.List;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 public class Po {
 	public static int len(Str value) {
@@ -33,60 +31,11 @@ public class Po {
 		return intJava(value.toString(), base);
 	}
 
-	private static final Pattern numPrefix = Pattern.compile("^([+-]?)(0[bBoOxX]?)?(.*)$");
-
-	private static int guessedBase(String basePrefix) {
-		if (basePrefix == null) {
-			return 0;
-		} else if (basePrefix.length() == 1) {
-			return 8; // prefix "0"
-		} else {
-			switch (basePrefix.charAt(1)) {
-			case 'b':
-			case 'B':
-				return 2;
-			case 'x':
-			case 'X':
-				return 16;
-			case 'o':
-			case 'O':
-				return 8;
-			}
-		}
-		throw new AssertionError();
-	}
-
 	private static int intJava(String value, int base) {
-		if ((base != 0) && (base < 2 || base > 36))
-			throw new IllegalArgumentException();
-
-		Matcher m = numPrefix.matcher(value);
-		if (!m.matches()) {
-			throw new NumberFormatException("Value '" + value + "' does not match pattern " + numPrefix);
-		}
-
-		String sign = m.group(1);
-		String basePrefix = m.group(2);
-		String digits = m.group(3);
-
-		// This refers to just 0, not 0O or 0o.
-		boolean hasOctalZeroPrefix = (basePrefix != null) && basePrefix.equals("0");
-
-		// If zero is the only digit, stripping it may be rude.
-		if (hasOctalZeroPrefix)
-			digits = "0" + digits;
-
-		int guessedBase = guessedBase(basePrefix);
-
 		if (base == 0) {
-			base = (guessedBase == 0) ? 10 : guessedBase;
-		} else {
-			if (!hasOctalZeroPrefix && (guessedBase != 0) && (base != guessedBase))
-				throw new NumberFormatException("Base-" + guessedBase + " literal '" + value
-						+ "' is not a valid literal in base " + base);
+			throw new UnsupportedOperationException("Base 0 is not allowed in this implementation");
 		}
-
-		return Integer.parseInt(sign + digits, base);
+		return Integer.parseInt(value, base);
 	}
 
 	public static List<Integer> xrange(final int start, int post, final int step) {

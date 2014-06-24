@@ -1,12 +1,25 @@
 package us.hfgk.ardpicprog;
 
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.util.logging.Logger;
+
 import us.hfgk.ardpicprog.pylike.Po;
 import us.hfgk.ardpicprog.pylike.PylikeReadable;
+import us.hfgk.ardpicprog.pylike.Re;
 import us.hfgk.ardpicprog.pylike.Str;
 
 class HexFileParser {
+	@SuppressWarnings("unused")
+	private static final Logger log = Logger.getLogger(HexFileParser.class.getName());
+	
+	private static final int LINE_NONDATA_SIZE = 5;
+	// 0: Byte count n
+	// 1: Address H
+	// 2: Address L
+	// 3: Record type
+	// 4 .. n+4: Data (n bytes)
+	// n+5: Checksum
+	
 	// Record types
 	private static final int RECORD_DATA = 0x00;
 	private static final int RECORD_EOF = 0x01;
@@ -16,27 +29,15 @@ class HexFileParser {
 	private static final int RECORD_START_LINEAR_ADDRESS = 0x05;
 
 	// Dummy base address to express that reading record was successful
-	private static final int READ_RECORD_OK = 0x7FFFFFFF;
+	private static final int READ_EOF_RECORD_OK = 0x7FFFFFFF;
 
-	private static int DIGIT_COLON = 0x10;
-
-	private static void copyLineToWords(ShortList words, byte[] line, int wordAddress) {
-		for (int byteIndex : Po.xrange(0, line.length - 5, 2)) {
+	private static void copyLineToWords(ShortList words, Str line, int wordAddress) {
+		for (int byteIndex : Po.xrange(0, Po.len(line) - LINE_NONDATA_SIZE, 2)) {
 			int wordIndex = byteIndex >> 1;
 			words.set(wordAddress + wordIndex, readLittleWord(line, byteIndex + 4));
 		}
 	}
-
-	private static int examineDigit(Str s) {
-		if (s.equals(Str.val(":")))
-			return DIGIT_COLON;
-		try {
-			return Po.int_(s, 16);
-		} catch (NumberFormatException e) {
-			return -1;
-		}
-	}
-
+	
 	public static HexFile load(HexFileMetadata details, PylikeReadable file) throws IOException {
 		if (details == null)
 			throw new IllegalArgumentException();
@@ -44,163 +45,152 @@ class HexFileParser {
 		loadIntoShortList(words, file);
 		return new HexFile(details, words);
 	}
+	
+	private static Str hexFileLineToData(Str textLine) throws HexFileException {
+		Str withoutSpaces = Re.sub(Str.val("[ \\t\\r\\n\\x00]+"), Str.EMPTY, textLine);
+		if(!withoutSpaces.startswith(Str.val(":")))
+			throw new HexFileException("Hex file line must begin with ':'");
+		Str digitsOnly = withoutSpaces.pYslice(1);
+		Str result = hexDigitsToBytes(digitsOnly);
+		return result;
+	}
 
-	private static void loadIntoShortList(ShortList words, PylikeReadable file) throws IOException, HexFileException {
-		boolean startLine = true;
-		ByteArrayOutputStream line = new ByteArrayOutputStream();
-		int digit;
-		int nibble = -1;
-
-		int baseAddress = 0;
-
-		Str chstr;
-
-		while (!(chstr = file.read(1)).equals(Str.EMPTY)) {
-			// ch = 0xFF & Po.getitem(chstr, 0);
-
-			if (chstr.equals(Str.val(" ")) || chstr.equals(Str.val("\t")))
-				continue;
-
-			if (chstr.equals(Str.val("\r")) || chstr.equals(Str.val("\n"))) {
-				if (nibble != -1) {
-					// Half a byte at the end of the line.
-					throw new HexFileException("Half byte at end of line");
-				}
-
-				if (!startLine) {
-					byte[] bytes = line.toByteArray();
-					validateSize(bytes);
-					validateChecksum(bytes);
-
-					baseAddress = readRecord(words, bytes, baseAddress);
-					if (baseAddress == READ_RECORD_OK) {
-						return; // ok
-					}
-				}
-				line.reset();
-				startLine = true;
-				continue;
+	private static Str hexDigitsToBytes(Str digitsOnly) throws HexFileException {
+		Str result = Str.EMPTY;
+		while(Po.len(digitsOnly) >= 2) {
+			Str these = digitsOnly.pYslice(0, 2);
+			digitsOnly = digitsOnly.pYslice(2);
+			try {
+				int b = Po.int_(these, 16);
+				result = result.pYappend((byte)b);
 			}
-
-			digit = examineDigit(chstr);
-
-			if (digit == DIGIT_COLON) {
-				if (!startLine) {
-					// ':' did not appear at the start of a line.
-					throw new HexFileException("':' must not appear after the beginning of a line");
-				} else {
-					startLine = false;
-					continue;
-				}
-			} else if (digit < 0) {
-				// Invalid character in hex file.
-				throw new HexFileException("Invalid hex character '" + chstr + "'");
-			} else {
-
-				if (startLine) {
-					// Hex digit at the start of a line.
-					throw new HexFileException("Hex digit must not appear at the beginning of a line");
-				}
-				if (nibble == -1) {
-					nibble = digit;
-				} else {
-					line.write((byte) ((nibble << 4) | digit));
-					nibble = -1;
-				}
+			catch(NumberFormatException e) {
+				throw new HexFileException("Invalid hex digits '" + these + "'", e);
 			}
 		}
+		if(Po.len(digitsOnly) > 0) {
+			throw new HexFileException("Hex file line contained odd number of digits");
+		}
+		return result;
+	}
+	
+	private static void loadIntoShortList(ShortList words, PylikeReadable file) throws IOException {
+		int baseAddress = 0;
 
-		throw new HexFileException("Unexpected end of input");
+		for(Str textLine : file.readlines()) {
+			Str data = hexFileLineToData(textLine);
+			validateSize(data);
+			validateChecksum(data);
+			
+			baseAddress = readRecord(words, data, baseAddress);
+			if (baseAddress == READ_EOF_RECORD_OK) {
+				return; // ok
+			}
+		}
 	}
 
 	// Read a big-endian word value from a buffer.
-	private static short readBigWord(byte[] bytes, int index) {
-		return shortFromBytes(bytes[index], bytes[index + 1]);
+	private static short readBigWord(Str bytes, int index) {
+		byte a = Po.getitem(bytes, index);
+		byte b = Po.getitem(bytes, index + 1);
+		return shortFromBytes(a, b);
 	}
 
 	// Read a little-endian word value from a buffer.
-	private static short readLittleWord(byte[] bytes, int index) {
-		return shortFromBytes(bytes[index + 1], bytes[index]);
+	private static short readLittleWord(Str bytes, int index) {
+		byte a = Po.getitem(bytes, index);
+		byte b = Po.getitem(bytes, index + 1);
+		return shortFromBytes(b, a);
 	}
 
-	private static int readRecord(ShortList words, byte[] line, int baseAddress) throws HexFileException {
+	private static int readRecord(ShortList words, Str line, int baseAddress) throws HexFileException {
+		byte recordType = Po.getitem(line, 3);
+		byte dataByteCount = Po.getitem(line, 0);
 
-		byte byte3 = line[3];
-		byte byte0 = line[0];
-
-		switch (byte3) {
+		switch (recordType) {
 		case RECORD_DATA:
-			// Data record.
-			if ((byte0 & 0x01) != 0)
-				throw new HexFileException("Line length must be even");
-
-			int address = baseAddress + readBigWord(line, 1);
-			if ((address & 0x0001) != 0)
-				throw new HexFileException("Address must be even");
-
-			copyLineToWords(words, line, address >> 1); // pass word address
-			return baseAddress;
-
+			return readDataRecord(words, line, baseAddress, dataByteCount);
 		case RECORD_EOF:
-			// Stop processing at the End Of File Record.
-			if (byte0 != 0x00)
-				throw new HexFileException("Invalid end of file record");
-			return READ_RECORD_OK; // fake OK
-
+			return readEOFRecord(dataByteCount);
 		case RECORD_EXTENDED_SEGMENT_ADDRESS:
-			// Extended Segment Address Record.
-			if (byte0 != 0x02)
-				throw new HexFileException("Invalid segment address record");
-			return (readBigWord(line, 4)) << 4;
-
+			return readExtendedSegmentAddressRecord(line, dataByteCount);
 		case RECORD_EXTENDED_LINEAR_ADDRESS:
-			// Extended Linear Address Record.
-			if (byte0 != 0x02)
-				throw new HexFileException("Invalid address record");
-			return (readBigWord(line, 4)) << 16;
-
+			return readExtendedLinearAddressRecord(line, dataByteCount);
 		case RECORD_START_SEGMENT_ADDRESS:
 		case RECORD_START_LINEAR_ADDRESS:
 			// do nothing
 			return baseAddress;
-
 		default:
-			// Invalid record type.
 			throw new HexFileException("Invalid record type");
 		}
+	}
+
+	private static int readExtendedLinearAddressRecord(Str line, byte dataByteCount) throws HexFileException {
+		// Extended Linear Address Record.
+		if (dataByteCount != 0x02)
+			throw new HexFileException("Invalid address record");
+		return (readBigWord(line, 4)) << 16;
+	}
+
+	private static int readExtendedSegmentAddressRecord(Str line, byte dataByteCount) throws HexFileException {
+		// Extended Segment Address Record.
+		if (dataByteCount != 0x02)
+			throw new HexFileException("Invalid segment address record");
+		return (readBigWord(line, 4)) << 4;
+	}
+
+	private static int readEOFRecord(byte dataByteCount) throws HexFileException {
+		// Stop processing at the End Of File Record.
+		if (dataByteCount != 0x00)
+			throw new HexFileException("Invalid end of file record");
+		return READ_EOF_RECORD_OK; // fake OK
+	}
+
+	private static int readDataRecord(ShortList words, Str line, int baseAddress, byte dataByteCount)
+			throws HexFileException {
+		// Data record.
+		if ((dataByteCount & 0x01) != 0)
+			throw new HexFileException("Line length must be even");
+
+		int address = baseAddress + readBigWord(line, 1);
+		if ((address & 0x0001) != 0)
+			throw new HexFileException("Address must be even");
+
+		copyLineToWords(words, line, address >> 1); // pass word address
+		return baseAddress;
 	}
 
 	private static short shortFromBytes(byte high, byte low) {
 		return (short) (((high & 0xFF) << 8) | (low & 0xFF));
 	}
 
-	private static void validateChecksum(byte[] line) throws HexFileException {
-		int checksum;
-		checksum = 0;
+	private static void validateChecksum(Str dataLine) throws HexFileException {
+		int checksum = 0;
 
 		// This omits the last byte from the checksum.
-		byte previous = (byte) 0;
-		for (byte b : line) {
-			checksum += (previous & 0xFF);
-			previous = b;
+		int last = 0;
+		for (Str b : dataLine.charsIn()) { // Python: for b in line
+			checksum += (last & 0xFF);
+			last = Po.ord(b);
 		}
 
 		checksum = (((checksum & 0xFF) ^ 0xFF) + 1) & 0xFF;
 
-		if (checksum != (line[line.length - 1] & 0xFF)) {
-			// Checksum for this line is incorrect.
+		if (checksum != (last & 0xFF)) {
 			throw new HexFileException("Line checksum is not correct");
 		}
 	}
 
-	private static void validateSize(byte[] line) throws HexFileException {
-		if (line.length < 5) {
-			// Not enough bytes to form a valid line.
-			throw new HexFileException("Line too short");
+	private static void validateSize(Str dataLine) throws HexFileException {
+		int lineLength = Po.len(dataLine);
+
+		if (lineLength < LINE_NONDATA_SIZE) {
+			throw new HexFileException("Not enough bytes to form a valid line");
 		}
 
-		if ((line[0] & 0xFF) != line.length - 5) {
-			// Size value is incorrect.
+		int dataByteCount = Po.getitem(dataLine, 0) & 0xFF; // NB python will need ord()
+
+		if (dataByteCount != lineLength - LINE_NONDATA_SIZE) {
 			throw new HexFileException("Line size is not correct");
 		}
 	}

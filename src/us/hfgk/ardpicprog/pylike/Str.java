@@ -1,6 +1,8 @@
 package us.hfgk.ardpicprog.pylike;
 
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 
 public final class Str {
@@ -122,11 +124,7 @@ public final class Str {
 		endIndex = adjustIndex(endIndex);
 		if (endIndex < startIndex)
 			endIndex = startIndex;
-		return (startIndex == endIndex) ? EMPTY : new Str(value, startIndex, endIndex);
-	}
-
-	public Str slice(int startIndex) {
-		return pYslice(startIndex, length());
+		return (startIndex == endIndex) ? EMPTY : new Str(value, startIndex, endIndex - startIndex);
 	}
 
 	public boolean startswith(Str prefix) {
@@ -262,5 +260,21 @@ public final class Str {
 		if (length() != 1)
 			throw new IllegalArgumentException();
 		return 0xFF & value[0];
+	}
+	
+	public List<Str> charsIn() {
+		ArrayList<Str> charStrs = new ArrayList<Str>(length());
+		for(int i = 0; i < value.length; ++i) {
+			charStrs.add(Str.val(value[i]));
+		}
+		return Collections.unmodifiableList(charStrs);
+	}
+	
+	public String hexDump() {
+		StringBuilder sb = new StringBuilder();
+		for(byte v : value) {
+			sb.append(Integer.toString(0x1000 | (v & 0xFF), 16).substring(2));
+		}
+		return sb.toString();
 	}
 }

@@ -8,4 +8,6 @@ public interface PylikeReadable extends Closeable {
 	Str read() throws IOException;
 	/** Read up to this number of bytes. **/
 	Str read(int size) throws IOException;
+	/** Read the file as lines **/
+	Iterable<Str> readlines() throws IOException;
 }
