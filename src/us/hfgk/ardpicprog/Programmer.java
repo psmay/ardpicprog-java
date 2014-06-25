@@ -396,8 +396,7 @@ public class Programmer implements Closeable {
 		}
 	}
 
-	private void writeFrom(boolean forceCalibration, AddressRange range, short[] data) throws IOException,
-			PacketResponseException {
+	public void writeFrom(AddressRange range, short[] data, boolean forceCalibration) throws IOException {
 
 		if (range.size() != data.length)
 			throw new IllegalArgumentException("Data array must be the same size as the range");
@@ -492,53 +491,35 @@ public class Programmer implements Closeable {
 		return (a < b) ? a : b;
 	}
 
-	private boolean forceCalibration = false;
-
-	public void writeFrom(AddressRange range, short[] srcArray) throws IOException {
-		writeFrom(forceCalibration, range, srcArray);
-	}
-
-	public void setForceCalibration(boolean value) {
-		forceCalibration = value;
-	}
-
-	public boolean getForceCalibration() {
-		return forceCalibration;
-	}
-
 	void write(HexFile hexFile, boolean forceCalibration) throws IOException {
-		setForceCalibration(forceCalibration);
-		write(hexFile);
+		write(hexFile.getMetadata().getDevice(), hexFile.getWords(), forceCalibration);
 	}
 
-	void write(HexFile hexFile) throws IOException {
-		write(hexFile.getMetadata().getDevice(), hexFile.getWords());
-	}
-
-	void write(DeviceDetails device, ReadableShortList data) throws IOException {
-		AddressRange programRangeForWrite = (this.getForceCalibration() || device.reservedRange.isEmpty()) ? device.programRange
+	void write(DeviceDetails device, ReadableShortList data, boolean forceCalibration) throws IOException {
+		AddressRange programRangeForWrite = (forceCalibration || device.reservedRange.isEmpty()) ? device.programRange
 				: device.programStartToReservedStart();
 
 		// Write the contents of program memory.
 
-		this.writeArea(data, "program memory", programRangeForWrite, device.programRange.isEmpty());
+		this.writeArea(data, "program memory", programRangeForWrite, forceCalibration, device.programRange.isEmpty());
 
 		// Write data memory before config memory in case the configuration
 		// word turns on data protection and thus hinders data verification.
-		this.writeArea(data, "data memory", device.dataRange, device.dataRange.isEmpty());
+		this.writeArea(data, "data memory", device.dataRange, forceCalibration, device.dataRange.isEmpty());
 
 		// Write the contents of config memory.
-		this.writeArea(data, "id words and fuses", device.configRange, device.configRange.isEmpty());
+		this.writeArea(data, "id words and fuses", device.configRange, forceCalibration, device.configRange.isEmpty());
 
 		log.info("done.");
 	}
 
-	private void writeArea(ReadableShortList source, String desc, AddressRange range, boolean skip) throws IOException {
+	private void writeArea(ReadableShortList source, String desc, AddressRange range, boolean forceCalibration,
+			boolean skip) throws IOException {
 		if (skip)
 			log.info("Skipped burning " + desc + ",");
 		else {
 			log.info("Burning " + desc + ",");
-			int writeLen = this.write(source, range);
+			int writeLen = this.write(forceCalibration, source, range);
 			Programmer.reportCount(writeLen);
 		}
 	}
@@ -605,17 +586,17 @@ public class Programmer implements Closeable {
 		}
 	}
 
-	public int write(ReadableShortList list, AddressRange writeRange) throws IOException {
+	public int write(boolean forceCalibration, ReadableShortList list, AddressRange writeRange) throws IOException {
 		int actualCopiedCount = 0;
-		
+
 		for (AddressRange range : list.extentsWithin(writeRange)) {
-			this.writeFrom(range, list.get(range));
+			writeFrom(range, list.get(range), forceCalibration);
 			actualCopiedCount += range.size();
 		}
-		
+
 		return actualCopiedCount;
 	}
-	
+
 	private static void reportCount(int count) {
 		log.info((count == 1) ? " 1 location," : " " + count + " locations,");
 	}
