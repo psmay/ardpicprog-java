@@ -538,7 +538,7 @@ public class Programmer implements Closeable {
 			log.info("Skipped burning " + desc + ",");
 		else {
 			log.info("Burning " + desc + ",");
-			int writeLen = source.writeTo(this, range);
+			int writeLen = this.write(source, range);
 			Programmer.reportCount(writeLen);
 		}
 	}
@@ -605,6 +605,17 @@ public class Programmer implements Closeable {
 		}
 	}
 
+	public int write(ReadableShortList list, AddressRange writeRange) throws IOException {
+		int actualCopiedCount = 0;
+		
+		for (AddressRange range : list.extentsWithin(writeRange)) {
+			this.writeFrom(range, list.get(range));
+			actualCopiedCount += range.size();
+		}
+		
+		return actualCopiedCount;
+	}
+	
 	private static void reportCount(int count) {
 		log.info((count == 1) ? " 1 location," : " " + count + " locations,");
 	}

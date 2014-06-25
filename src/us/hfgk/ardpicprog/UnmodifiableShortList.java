@@ -1,29 +1,37 @@
 package us.hfgk.ardpicprog;
 
-import java.io.IOException;
 import java.util.List;
 
 public class UnmodifiableShortList implements ReadableShortList {
 
 	private final ReadableShortList source;
-	
+
 	public UnmodifiableShortList(ReadableShortList source) {
 		this.source = source;
 	}
 
+	@Override
 	public List<AddressRange> extents() {
 		return source.extents();
 	}
-
-	public short get(int index, short defaultValue) {
-		return source.get(index, defaultValue);
+	
+	@Override
+	public List<AddressRange> extentsWithin(AddressRange range) {
+		return source.extentsWithin(range);
 	}
 
+	@Override
 	public Short get(int index) {
 		return source.get(index);
 	}
 
-	public int writeTo(Programmer sink, AddressRange range) throws IOException {
-		return source.writeTo(sink, range);
+	@Override
+	public short get(int index, short defaultValue) {
+		return source.get(index, defaultValue);
+	}
+
+	@Override
+	public short[] get(AddressRange range) {
+		return source.get(range);
 	}
 }

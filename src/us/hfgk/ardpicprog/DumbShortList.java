@@ -1,17 +1,15 @@
 package us.hfgk.ardpicprog;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
-import java.util.logging.Logger;
 
 /**
  * Implementation of ShortList that uses only a resizable int buffer.
  */
 public class DumbShortList implements ShortList {
-	private static final Logger log = Logger.getLogger(DumbShortList.class.getName());
+	//private static final Logger log = Logger.getLogger(DumbShortList.class.getName());
 
 	private int[] buffer = new int[0];
 
@@ -24,7 +22,8 @@ public class DumbShortList implements ShortList {
 		}
 	}
 
-	private List<AddressRange> extentsWithin(AddressRange overRange) {
+	@Override
+	public List<AddressRange> extentsWithin(AddressRange overRange) {
 		ArrayList<AddressRange> ranges = new ArrayList<AddressRange>();
 
 		AddressRange range = AddressRange.empty(overRange.start());
@@ -81,34 +80,8 @@ public class DumbShortList implements ShortList {
 	}
 
 	@Override
-	public int writeTo(Programmer sink, AddressRange writeRange) throws IOException {
-		List<AddressRange> ranges = extentsWithin(writeRange);
-		int actualCopiedCount = 0;
-
-		short[] send = new short[0];
-
-		for (AddressRange range : ranges) {
-			log.finest("On range: " + range);
-			if (send.length < range.size()) {
-				send = new short[range.size()];
-				log.finest("Enlarged send buffer to " + send.length);
-			}
-
-			Common.copyIntsToShortArray(buffer, range.start(), send, 0, range.size());
-
-			log.finest("Doing writeFrom for " + range + ", send buffer with length " + send.length + ", offset 0");
-
-			{
-				short[] sendx = send;
-				if (sendx.length != range.size())
-					sendx = Arrays.copyOf(sendx, range.size());
-				sink.writeFrom(range, sendx);
-			}
-
-			actualCopiedCount += range.size();
-		}
-
-		return actualCopiedCount;
+	public short[] get(AddressRange range) {
+		return Common.copyIntsToShortArray(buffer, range.start(), range.size());
 	}
 
 	@Override
