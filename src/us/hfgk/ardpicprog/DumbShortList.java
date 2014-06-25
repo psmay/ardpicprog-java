@@ -116,25 +116,12 @@ public class DumbShortList implements ShortList {
 		buffer = new int[0];
 	}
 
-	@Override
-	public void set(int index, short value) {
-		log.finest("Set index " + index + " <- " + value);
-		ensureCapacity(index + 1);
-		buffer[index] = 0xFFFF & (int) value;
-	}
-
 	private void writeAt(int index, short[] source, int offset, int length) {
 		if (index < 0 || offset < 0 || length < 0 || offset + length > source.length)
 			throw new IndexOutOfBoundsException();
 		ensureCapacity(index + length);
 
 		Common.copyUnsignedShortsToIntArray(source, offset, buffer, index, length);
-	}
-
-	@Override
-	public void readFrom(Programmer source, AddressRange range) throws IOException {
-		log.finest("Set indices " + range + " from source");
-		set(range.start(), source.readCopy(range));
 	}
 
 	@Override

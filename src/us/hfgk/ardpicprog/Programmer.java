@@ -559,7 +559,7 @@ public class Programmer implements Closeable {
 		AddressRange range = area._2;
 		if (!range.isEmpty()) {
 			log.info("Reading " + areaDesc + ",");
-			dest.readFrom(this, range);
+			dest.set(range.start(), this.readCopy(range));
 		} else {
 			log.info("Skipped reading " + areaDesc + ",");
 		}
