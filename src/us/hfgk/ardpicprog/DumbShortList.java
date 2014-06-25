@@ -8,7 +8,7 @@ import java.util.List;
 import java.util.logging.Logger;
 
 /**
- * Implementation of ShortList that uses only a resizable int buffer. 
+ * Implementation of ShortList that uses only a resizable int buffer.
  */
 public class DumbShortList implements ShortList {
 	private static final Logger log = Logger.getLogger(DumbShortList.class.getName());
@@ -81,7 +81,7 @@ public class DumbShortList implements ShortList {
 	}
 
 	@Override
-	public int writeTo(ShortSink sink, AddressRange writeRange) throws IOException {
+	public int writeTo(Programmer sink, AddressRange writeRange) throws IOException {
 		List<AddressRange> ranges = extentsWithin(writeRange);
 		int actualCopiedCount = 0;
 
@@ -97,7 +97,13 @@ public class DumbShortList implements ShortList {
 			Common.copyIntsToShortArray(buffer, range.start(), send, 0, range.size());
 
 			log.finest("Doing writeFrom for " + range + ", send buffer with length " + send.length + ", offset 0");
-			sink.writeFrom(range, send);
+
+			{
+				short[] sendx = send;
+				if (sendx.length != range.size())
+					sendx = Arrays.copyOf(sendx, range.size());
+				sink.writeFrom(range, sendx);
+			}
 
 			actualCopiedCount += range.size();
 		}
@@ -126,14 +132,14 @@ public class DumbShortList implements ShortList {
 	}
 
 	@Override
-	public void readFrom(ShortSource source, AddressRange range) throws IOException {
+	public void readFrom(Programmer source, AddressRange range) throws IOException {
 		log.finest("Set indices " + range + " from source");
 		set(range.start(), source.readCopy(range));
 	}
 
 	@Override
 	public void set(int index, short... values) {
-		writeAt(index, values, 0, values.length);		
+		writeAt(index, values, 0, values.length);
 	}
 
 }

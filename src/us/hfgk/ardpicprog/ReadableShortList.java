@@ -27,5 +27,5 @@ interface ReadableShortList {
 	 * Copies values from the indices of this list specified by {@code range}
 	 * into {@code sink}.
 	 */
-	int writeTo(ShortSink sink, AddressRange range) throws IOException;
+	int writeTo(Programmer sink, AddressRange range) throws IOException;
 }

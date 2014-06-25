@@ -17,5 +17,5 @@ interface MutableShortList {
 	 * Copies values from {@code source} to the indices of this list specified
 	 * by {@code range}.
 	 */
-	void readFrom(ShortSource source, AddressRange range) throws IOException;
+	void readFrom(Programmer source, AddressRange range) throws IOException;
 }

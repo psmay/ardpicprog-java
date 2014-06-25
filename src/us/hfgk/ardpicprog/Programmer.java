@@ -1,6 +1,5 @@
 package us.hfgk.ardpicprog;
 
-import java.io.ByteArrayOutputStream;
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -298,25 +297,15 @@ public class Programmer implements Closeable {
 		}
 	}
 
-	private void bufferWords(short[] data, int srcOffset, int wordCount, ByteArrayOutputStream os) throws IOException {
+	private Str packetWordsToBytes(short[] data, int srcOffset, int wordCount) throws IOException {
+		Str str = Str.EMPTY;
 		int outputLength = (byte) (wordCount << 1);
-		os.write((byte) outputLength);
+		str = str.pYappend((byte) outputLength);
 		for (int i = 0; i < wordCount; ++i) {
 			short word = data[srcOffset + i];
-			os.write((byte) word);
-			os.write((byte) (word >> 8));
+			str = str.pYappend((byte) word).pYappend((byte) (word >> 8));
 		}
-	}
-
-	private static Str getStrFromJavaBaos(ByteArrayOutputStream os) {
-		byte[] b = os.toByteArray();
-		return Str.val(b, 0, b.length);
-	}
-
-	private void writePacketAndClear(ByteArrayOutputStream os) throws IOException {
-		Str s = getStrFromJavaBaos(os);
-		writePacket(s);
-		os.reset();
+		return str;
 	}
 
 	private void writePacket(Str s) throws IOException, PacketResponseException {
@@ -406,124 +395,114 @@ public class Programmer implements Closeable {
 		}
 	}
 
-	ShortSource getShortSource() {
-		return new PortBlockIO(this);
-	}
+	private void writeFrom(boolean forceCalibration, AddressRange range, short[] data) throws IOException,
+			PacketResponseException {
 
-	ShortSink getShortSink(boolean forceCalibration) {
-		return new PortBlockIO(this, forceCalibration);
-	}
+		if (range.size() != data.length)
+			throw new IllegalArgumentException("Data array must be the same size as the range");
 
-	private static class PortBlockIO implements ShortSink, ShortSource {
-		private Programmer port;
-		private boolean forceCalibration;
+		int offset = 0;
 
-		PortBlockIO(Programmer port) {
-			this(port, false);
-		}
+		int rangeSize = range.size();
 
-		PortBlockIO(Programmer port, boolean forceCalibration) {
-			this.port = port;
-			this.forceCalibration = forceCalibration;
-		}
+		if (rangeSize == 5) {
+			// Cannot use "WRITEBIN" for exactly 5 words (10 bytes), so use
+			// "WRITE" instead.
+			this.commandWrite(range.start(), forceCalibration, data);
+		} else {
+			this.commandWriteBin(range.start(), forceCalibration);
 
-		public void writeFrom(AddressRange range, short[] data) throws IOException {
-			int offset = 0;
-			
-			ByteArrayOutputStream buffer = new ByteArrayOutputStream(Programmer.BINARY_WORD_TRANSFER_MAX * 2 + 1);
-			int wordlen = (range.size());
-
-			if (wordlen == 5) {
-				// Cannot use "WRITEBIN" for exactly 10 bytes, so use "WRITE"
-				// instead.
-
-				port.commandWrite(range.start(), forceCalibration, Arrays.copyOfRange(data, 0, 5));
-			}
-
-			port.commandWriteBin(range.start(), forceCalibration);
-			while (wordlen >= Programmer.BINARY_WORD_TRANSFER_MAX) {
-				port.bufferWords(data, offset, Programmer.BINARY_WORD_TRANSFER_MAX, buffer);
-				port.writePacketAndClear(buffer);
-				offset += Programmer.BINARY_WORD_TRANSFER_MAX;
-				wordlen -= Programmer.BINARY_WORD_TRANSFER_MAX;
-			}
-			if (wordlen > 0) {
-				port.bufferWords(data, offset, wordlen, buffer);
-				port.writePacketAndClear(buffer);
+			while (offset < rangeSize) {
+				int transferSize = min(Programmer.BINARY_WORD_TRANSFER_MAX, rangeSize - offset);
+				this.writePacket(this.packetWordsToBytes(data, offset, transferSize));
+				offset += transferSize;
 			}
 
 			// Terminating packet.
-			port.writePacket(TERM_PACKET);
+			this.writePacket(TERM_PACKET);
 		}
+	}
 
-		@Override
-		public short[] readCopy(AddressRange range) throws IOException {
-			int rangePost = range.post();
-			ArrayList<Short> data = new ArrayList<Short>(range.size());
+	public short[] readCopy(AddressRange range) throws IOException {
+		int rangePost = range.post();
+		ArrayList<Short> data = new ArrayList<Short>(range.size());
 
-			int current = range.start();
+		int current = range.start();
 
-			port.commandReadBin(range);
+		this.commandReadBin(range);
 
-			while (current < rangePost) {
-				int pktlen = port.readProgrammerByte();
+		while (current < rangePost) {
+			int pktlen = this.readProgrammerByte();
 
-				if (pktlen < 0) {
-					throw new EOFException();
-				} else if (pktlen > 0) {
-					Str bytes = port.read(pktlen);
-					int numWords = min(rangePost - current, pktlen / 2);
-					addLittleWords(data, bytes, numWords);
-					current += numWords;
-				} else {
-					// pktlen == 0
-					break;
-				}
+			if (pktlen < 0) {
+				throw new EOFException();
+			} else if (pktlen > 0) {
+				Str bytes = this.read(pktlen);
+				int numWords = min(rangePost - current, pktlen / 2);
+				addLittleWords(data, bytes, numWords);
+				current += numWords;
+			} else {
+				// pktlen == 0
+				break;
 			}
-			if (current < rangePost) {
-				throw new ProgrammerException("Could not fill entire buffer");
-			}
-			return toPrimitiveArray(data);
 		}
+		if (current < rangePost) {
+			throw new ProgrammerException("Could not fill entire buffer");
+		}
+		return toPrimitiveArray(data);
+	}
 
-		private static final short[] toPrimitiveArray(List<Short> data) {
-			short[] output = new short[data.size()];
-			int actualCount = 0;
+	private static final short[] toPrimitiveArray(List<Short> data) {
+		short[] output = new short[data.size()];
+		int actualCount = 0;
 
-			for (short z : data) {
-				++actualCount;
-				if (actualCount > output.length) {
-					output = Arrays.copyOf(output, actualCount);
-				}
-				output[actualCount - 1] = z;
-			}
-
+		for (short z : data) {
+			++actualCount;
 			if (actualCount > output.length) {
 				output = Arrays.copyOf(output, actualCount);
 			}
-
-			return output;
+			output[actualCount - 1] = z;
 		}
 
-		private void addLittleWords(List<Short> dest, Str src, int wordCount) {
-			for (int byteIndex : Po.xrange(0, 2 * wordCount, 2)) {
-				dest.add(getLittleWord(src, byteIndex));
-			}
+		if (actualCount > output.length) {
+			output = Arrays.copyOf(output, actualCount);
 		}
 
-		private static final short getLittleWord(Str str, int index) {
-			return bytesToWord(Po.getitem(str, index + 1), Po.getitem(str, index));
-		}
+		return output;
+	}
 
-		private static final short bytesToWord(byte hiByte, byte loByte) {
-			int lo = (loByte & 0xFF);
-			int hi = (hiByte & 0xFF) << 8;
-			return (short) (lo | hi);
+	private static void addLittleWords(List<Short> dest, Str src, int wordCount) {
+		for (int byteIndex : Po.xrange(0, 2 * wordCount, 2)) {
+			dest.add(getLittleWord(src, byteIndex));
 		}
+	}
 
-		private static final int min(int a, int b) {
-			return (a < b) ? a : b;
-		}
+	private static final short getLittleWord(Str str, int index) {
+		return bytesToWord(Po.getitem(str, index + 1), Po.getitem(str, index));
+	}
+
+	private static final short bytesToWord(byte hiByte, byte loByte) {
+		int lo = (loByte & 0xFF);
+		int hi = (hiByte & 0xFF) << 8;
+		return (short) (lo | hi);
+	}
+
+	private static final int min(int a, int b) {
+		return (a < b) ? a : b;
+	}
+
+	private boolean forceCalibration = false;
+
+	public void writeFrom(AddressRange range, short[] srcArray) throws IOException {
+		writeFrom(forceCalibration, range, srcArray);
+	}
+
+	public void setForceCalibration(boolean value) {
+		forceCalibration = value;
+	}
+
+	public boolean getForceCalibration() {
+		return forceCalibration;
 	}
 
 }

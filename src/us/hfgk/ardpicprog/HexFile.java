@@ -78,7 +78,7 @@ public class HexFile {
 		return false;
 	}
 
-	public static boolean blankCheckRead(HexFileMetadata metadata, ShortSource source) throws IOException {
+	public static boolean blankCheckRead(HexFileMetadata metadata, Programmer source) throws IOException {
 		for (Tuple2<String, AddressRange> area : metadata.getAreas()) {			
 			if (!blankCheckArea(metadata, source, area))
 				return false;
@@ -86,7 +86,7 @@ public class HexFile {
 		return true;
 	}
 
-	private static boolean blankCheckArea(HexFileMetadata metadata, ShortSource shortSource, Tuple2<String, AddressRange> area)
+	private static boolean blankCheckArea(HexFileMetadata metadata, Programmer shortSource, Tuple2<String, AddressRange> area)
 			throws IOException {
 		String areaDesc = area._1;
 		AddressRange range = area._2;
@@ -105,7 +105,7 @@ public class HexFile {
 		}
 	}
 
-	public static void readFrom(ShortList words, ShortSource source, List<Tuple2<String, AddressRange>> areas)
+	public static void readFrom(ShortList words, Programmer source, List<Tuple2<String, AddressRange>> areas)
 			throws IOException {
 		words.clear();
 		// List<Tuple2<String, IntRange>> areas = getAreas();
@@ -117,7 +117,7 @@ public class HexFile {
 		log.info("done.");
 	}
 
-	private static void readAreaFrom(ShortList words, ShortSource source, Tuple2<String, AddressRange> area)
+	private static void readAreaFrom(ShortList words, Programmer source, Tuple2<String, AddressRange> area)
 			throws IOException {
 		String areaDesc = area._1;
 		AddressRange range = area._2;
@@ -129,7 +129,7 @@ public class HexFile {
 		}
 	}
 
-	private static boolean blankCheckFrom(HexFileMetadata metadata, ShortSource source, AddressRange range) throws IOException {
+	private static boolean blankCheckFrom(HexFileMetadata metadata, Programmer source, AddressRange range) throws IOException {
 		final short[] buf = source.readCopy(range);
 
 		int i = range.start();
@@ -156,15 +156,16 @@ public class HexFile {
 	}
 
 	public void writeTo(Programmer port, boolean forceCalibration) throws IOException {
-		writeTo(port.getShortSink(forceCalibration), forceCalibration);
+		port.setForceCalibration(forceCalibration);
+		writeTo(port, forceCalibration);
 	}
 
-	public void writeTo(ShortSink sink, boolean forceCalibration) throws IOException {
+	public void writeTo(Programmer sink) throws IOException {
 		// If the test is true, calibration forced or no reserved words to worry
 		// about.
 		// Else, assumes: reserved words are always at the end of program
 		// memory.
-		AddressRange programRangeForWrite = (forceCalibration || getMetadata().getDevice().reservedRange.isEmpty()) ? getMetadata().getDevice().programRange
+		AddressRange programRangeForWrite = (sink.getForceCalibration() || getMetadata().getDevice().reservedRange.isEmpty()) ? getMetadata().getDevice().programRange
 				: programStartToReservedStart();
 
 		// Write the contents of program memory.
@@ -184,7 +185,7 @@ public class HexFile {
 		return AddressRange.getPost(getMetadata().getDevice().programRange.start(), getMetadata().getDevice().reservedRange.start());
 	}
 
-	private void writeArea(ShortSink sink, String desc, AddressRange range, boolean skip) throws IOException {
+	private void writeArea(Programmer sink, String desc, AddressRange range, boolean skip) throws IOException {
 		if (skip)
 			log.info("Skipped burning " + desc + ",");
 		else {

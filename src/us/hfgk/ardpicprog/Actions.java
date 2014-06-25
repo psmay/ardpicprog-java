@@ -51,7 +51,7 @@ public class Actions {
 	static void doOutput(Str output, boolean skipOnes, Programmer port, HexFileMetadata hexMeta)
 			throws IOException, HexFileException {
 		ShortList words = Common.getBlankShortList();
-		HexFile.readFrom(words, port.getShortSource(), hexMeta.getAreas());
+		HexFile.readFrom(words, port, hexMeta.getAreas());
 		HexFile hexFile = new HexFile(hexMeta, words);
 
 		PylikeWritable file = null;
@@ -72,7 +72,7 @@ public class Actions {
 
 	static void doBlankCheck(Programmer port, HexFileMetadata metadata) throws IOException {
 		log.info("Checking whether device is blank");
-		if (HexFile.blankCheckRead(metadata, port.getShortSource())) {
+		if (HexFile.blankCheckRead(metadata, port)) {
 			log.info("Device appears to be blank");
 		} else {
 			log.info("Device appears to be NOT blank");
