@@ -62,4 +62,8 @@ final class DeviceDetails {
 		Str value = details.get(key);
 		return (value == null) ? defValue : value;
 	}
+
+	public AddressRange programStartToReservedStart() {
+		return AddressRange.getPost(this.programRange.start(), this.reservedRange.start());
+	}
 }

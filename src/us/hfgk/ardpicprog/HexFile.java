@@ -14,7 +14,11 @@ public class HexFile {
 
 	private final HexFileMetadata metadata;
 
-	private ReadableShortList words;
+	private final UnmodifiableShortList words;
+
+	public ReadableShortList getWords() {
+		return words;
+	}
 
 	public HexFile(Map<Str, Str> details, int format, ReadableShortList words) throws HexFileException {
 		this(new DeviceDetails(details), format, words);
@@ -27,8 +31,10 @@ public class HexFile {
 		if(words == null)
 			words = Common.getBlankReadableShortList();
 		
+		
 		this.metadata = metadata;
-		this.words = words;
+		
+		this.words = (words instanceof UnmodifiableShortList) ? (UnmodifiableShortList)words : new UnmodifiableShortList(words);
 	}
 	
 	public HexFile(DeviceDetails device, int format, ReadableShortList words) throws HexFileException {
@@ -143,7 +149,7 @@ public class HexFile {
 		return true;
 	}
 
-	private void reportCount(int count) {
+	private static void reportCount(int count) {
 		log.info((count == 1) ? " 1 location," : " " + count + " locations,");
 	}
 
@@ -155,42 +161,35 @@ public class HexFile {
 		HexFileSerializer.saveCC(this, file, skipOnes);
 	}
 
-	public void writeTo(Programmer port, boolean forceCalibration) throws IOException {
-		port.setForceCalibration(forceCalibration);
-		writeTo(port, forceCalibration);
-	}
-
-	public void writeTo(Programmer sink) throws IOException {
+	public static void writeTo(Programmer pgm, DeviceDetails device, ReadableShortList data) throws IOException {
 		// If the test is true, calibration forced or no reserved words to worry
 		// about.
 		// Else, assumes: reserved words are always at the end of program
-		// memory.
-		AddressRange programRangeForWrite = (sink.getForceCalibration() || getMetadata().getDevice().reservedRange.isEmpty()) ? getMetadata().getDevice().programRange
-				: programStartToReservedStart();
+		// memory.		
+		
+		AddressRange programRangeForWrite = (pgm.getForceCalibration() || device.reservedRange.isEmpty())
+				? device.programRange : device.programStartToReservedStart();
 
 		// Write the contents of program memory.
-		writeArea(sink, "program memory", programRangeForWrite, getMetadata().getDevice().programRange.isEmpty());
+		
+		writeArea(data, pgm, "program memory", programRangeForWrite, device.programRange.isEmpty());
 
 		// Write data memory before config memory in case the configuration
 		// word turns on data protection and thus hinders data verification.
-		writeArea(sink, "data memory", getMetadata().getDevice().dataRange, getMetadata().getDevice().dataRange.isEmpty());
+		writeArea(data, pgm, "data memory", device.dataRange, device.dataRange.isEmpty());
 
 		// Write the contents of config memory.
-		writeArea(sink, "id words and fuses", getMetadata().getDevice().configRange, getMetadata().getDevice().configRange.isEmpty());
+		writeArea(data, pgm, "id words and fuses", device.configRange, device.configRange.isEmpty());
 
 		log.info("done.");
 	}
 
-	private AddressRange programStartToReservedStart() {
-		return AddressRange.getPost(getMetadata().getDevice().programRange.start(), getMetadata().getDevice().reservedRange.start());
-	}
-
-	private void writeArea(Programmer sink, String desc, AddressRange range, boolean skip) throws IOException {
+	private static void writeArea(ReadableShortList words, Programmer pgm, String desc, AddressRange range, boolean skip) throws IOException {
 		if (skip)
 			log.info("Skipped burning " + desc + ",");
 		else {
 			log.info("Burning " + desc + ",");
-			reportCount(words.writeTo(sink, range));
+			reportCount(words.writeTo(pgm, range));
 		}
 	}
 

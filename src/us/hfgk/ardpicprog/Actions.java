@@ -13,7 +13,8 @@ public class Actions {
 	private static final Logger log = Logger.getLogger(Actions.class.getName());
 
 	static void doBurn(boolean forceCalibration, Programmer port, HexFile hexFile) throws IOException {
-		hexFile.writeTo(port, forceCalibration);
+		port.setForceCalibration(forceCalibration);
+		HexFile.writeTo(port, hexFile.getMetadata().getDevice(), hexFile.getWords());
 	}
 
 	static void doCCOutput(Str ccOutput, boolean skipOnes, HexFile hexFile) throws IOException {
