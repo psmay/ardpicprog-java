@@ -24,12 +24,12 @@ class HexFileParser {
 	private static final int BASEADDRESS_DONE = -1;
 
 	// Record types
-	private static final int RECORD_DATA = 0x00;
-	private static final int RECORD_EOF = 0x01;
-	private static final int RECORD_EXTENDED_SEGMENT_ADDRESS = 0x02;
-	private static final int RECORD_START_SEGMENT_ADDRESS = 0x03;
-	private static final int RECORD_EXTENDED_LINEAR_ADDRESS = 0x04;
-	private static final int RECORD_START_LINEAR_ADDRESS = 0x05;
+	public static final byte RECORD_DATA = 0x00;
+	public static final byte RECORD_EOF = 0x01;
+	public static final byte RECORD_EXTENDED_SEGMENT_ADDRESS = 0x02;
+	public static final byte RECORD_START_SEGMENT_ADDRESS = 0x03;
+	public static final byte RECORD_EXTENDED_LINEAR_ADDRESS = 0x04;
+	public static final byte RECORD_START_LINEAR_ADDRESS = 0x05;
 
 	private static short[] convertDataLineToWords(Str dataLine) {
 		Str actualData = dataLine.pYslice(4, -1);
@@ -111,7 +111,7 @@ class HexFileParser {
 		int wordAddress = address >> 1;
 
 		words.set(wordAddress, convertDataLineToWords(line));
-		
+
 		return baseAddress;
 	}
 
@@ -170,20 +170,22 @@ class HexFileParser {
 	}
 
 	private static void validateChecksum(Str dataLine) throws HexFileException {
-		int checksum = 0;
+		Str allButLastByte = dataLine.pYslice(0, -1);
 
-		// This omits the last byte from the checksum.
-		int last = 0;
-		for (Str b : dataLine.charsIn()) { // Python: for b in line
-			checksum += (last & 0xFF);
-			last = Po.ord(b);
-		}
+		byte computedChecksum = computeChecksum(allButLastByte);
+		byte readChecksum = (byte) Po.ord(dataLine.pYslice(-1));
 
-		checksum = (((checksum & 0xFF) ^ 0xFF) + 1) & 0xFF;
-
-		if (checksum != (last & 0xFF)) {
+		if (computedChecksum != readChecksum) {
 			throw new HexFileException("Line checksum is not correct");
 		}
+	}
+
+	public static byte computeChecksum(Str dataWithoutChecksumByte) {
+		int sum = 0;
+		for (Str ch : dataWithoutChecksumByte.charsIn()) {
+			sum += Po.ord(ch);
+		}
+		return (byte) -sum;
 	}
 
 	private static void validateSize(Str dataLine) throws HexFileException {
@@ -200,4 +202,5 @@ class HexFileParser {
 			throw new HexFileException("Line size is not correct");
 		}
 	}
+
 }

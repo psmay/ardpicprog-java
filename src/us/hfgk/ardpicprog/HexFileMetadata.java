@@ -74,4 +74,10 @@ public class HexFileMetadata {
 	public boolean wouldBeAllOnes(int address, short wordValue) {
 		return wordValue == fullWordAtAddress(address);
 	}
+
+	public int getEffectiveFormat() {
+		int baseFormat = getFormat();
+		return (baseFormat == FORMAT_AUTO && getDevice().programBits == 16)
+				? FORMAT_IHX32 : baseFormat;
+	}
 }

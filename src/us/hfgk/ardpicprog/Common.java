@@ -34,6 +34,11 @@ abstract class Common {
 	static String toX2(int value) {
 		return Integer.toString(0x100 | (value & 0xFF), 16).substring(1).toUpperCase();
 	}
+	
+	static Str toX2Str(int value) {
+		// FIXME
+		return Str.val(toX2(value));
+	}
 
 	static String toX2(byte[] values, int offset, int length) {
 		StringBuilder sb = new StringBuilder(length * 2);
@@ -42,6 +47,13 @@ abstract class Common {
 			sb.append(toX2(values[i]));
 		}
 		return sb.toString();
+	}
+	
+	static Str toX2(Str values) {
+		// FIXME
+		byte[] bb = values.getJavaByteArray();
+		String s = toX2(bb, 0, bb.length);
+		return Str.val(s);
 	}
 
 	public static List<Str> toX4(List<Number> values) {
