@@ -11,6 +11,12 @@ public class HexFileMetadata {
 	private final int format;
 	private final DeviceDetails device;
 
+	// Hex file formats
+	public static final int FORMAT_AUTO = -1;
+	public static final int FORMAT_IHX8M = 0;
+	public static final int FORMAT_IHX16 = 1;
+	public static final int FORMAT_IHX32 = 2;
+
 	public HexFileMetadata(DeviceDetails device, int format) throws HexFileException {
 		if (device == null) {
 			device = new DeviceDetails(Collections.<Str, Str> emptyMap());
@@ -29,16 +35,16 @@ public class HexFileMetadata {
 
 	static int validateFormat(int format) throws HexFileException {
 		switch (format) {
-		case HexFile.FORMAT_AUTO:
-		case HexFile.FORMAT_IHX8M:
-		case HexFile.FORMAT_IHX16:
-		case HexFile.FORMAT_IHX32:
+		case HexFileMetadata.FORMAT_AUTO:
+		case HexFileMetadata.FORMAT_IHX8M:
+		case HexFileMetadata.FORMAT_IHX16:
+		case HexFileMetadata.FORMAT_IHX32:
 			return format;
 		default:
 			throw new HexFileException("Unknown format");
 		}
 	}
-	
+
 	int programSizeWords() {
 		return device.programRange.size();
 	}
@@ -50,11 +56,11 @@ public class HexFileMetadata {
 	public int bitWidthAtAddress(int address) {
 		return device.dataRange.containsValue(address) ? getDevice().dataBits : getDevice().programBits;
 	}
-	
+
 	public short fullWordAtAddress(int address) {
 		return (short) ((1 << bitWidthAtAddress(address)) - 1);
 	}
-	
+
 	List<Tuple2<String, AddressRange>> getAreas() {
 		List<Tuple2<String, AddressRange>> ls = new ArrayList<Tuple2<String, AddressRange>>();
 

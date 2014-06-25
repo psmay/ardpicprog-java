@@ -26,7 +26,7 @@ public class App {
 		String input;
 		String output;
 		String ccOutput;
-		int format = HexFile.FORMAT_AUTO;
+		int format = HexFileMetadata.FORMAT_AUTO;
 		boolean skipOnes = false;
 		boolean erase = false;
 		boolean burn = false;
@@ -165,9 +165,9 @@ public class App {
 		int opt;
 		while ((opt = g.getopt()) != -1) {
 			switch (opt) {
-			case HexFile.FORMAT_IHX8M:
-			case HexFile.FORMAT_IHX16:
-			case HexFile.FORMAT_IHX32:
+			case HexFileMetadata.FORMAT_IHX8M:
+			case HexFileMetadata.FORMAT_IHX16:
+			case HexFileMetadata.FORMAT_IHX32:
 				// Set the hexfile format: IHX8M, IHX16, or IHX32.
 				options.format = opt;
 				break;
@@ -265,9 +265,9 @@ public class App {
 			new LongOpt("erase", LongOpt.NO_ARGUMENT, null, Options.ERASE),
 			new LongOpt("force-calibration", LongOpt.NO_ARGUMENT, null, Options.FORCE_CALIBRATION),
 			new LongOpt("help", LongOpt.NO_ARGUMENT, null, Options.HELP),
-			new LongOpt("ihx8m", LongOpt.NO_ARGUMENT, null, HexFile.FORMAT_IHX8M),
-			new LongOpt("ihx16", LongOpt.NO_ARGUMENT, null, HexFile.FORMAT_IHX16),
-			new LongOpt("ihx32", LongOpt.NO_ARGUMENT, null, HexFile.FORMAT_IHX32),
+			new LongOpt("ihx8m", LongOpt.NO_ARGUMENT, null, HexFileMetadata.FORMAT_IHX8M),
+			new LongOpt("ihx16", LongOpt.NO_ARGUMENT, null, HexFileMetadata.FORMAT_IHX16),
+			new LongOpt("ihx32", LongOpt.NO_ARGUMENT, null, HexFileMetadata.FORMAT_IHX32),
 			new LongOpt("input-hexfile", LongOpt.REQUIRED_ARGUMENT, null, Options.INPUT_HEXFILE),
 			new LongOpt("output-hexfile", LongOpt.REQUIRED_ARGUMENT, null, Options.OUTPUT_HEXFILE),
 			new LongOpt("pic-serial-port", LongOpt.REQUIRED_ARGUMENT, null, Options.PIC_SERIAL_PORT),

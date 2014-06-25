@@ -1,9 +1,9 @@
 package us.hfgk.ardpicprog;
 
-import java.io.IOException;
 import java.util.List;
 import java.util.Map;
-import us.hfgk.ardpicprog.pylike.PylikeWritable;
+
+import us.hfgk.ardpicprog.pylike.Po;
 import us.hfgk.ardpicprog.pylike.Str;
 
 public class HexFile {
@@ -42,12 +42,6 @@ public class HexFile {
 		this(details, format, null);
 	}
 
-	// Hex file formats
-	public static final int FORMAT_AUTO = -1;
-	public static final int FORMAT_IHX8M = 0;
-	public static final int FORMAT_IHX16 = 1;
-	public static final int FORMAT_IHX32 = 2;
-
 	public List<AddressRange> extents() {
 		return words.extents();
 	}
@@ -61,24 +55,16 @@ public class HexFile {
 	}
 
 	public boolean canForceCalibration() {
-		if (getMetadata().getDevice().reservedRange.isEmpty())
+		AddressRange reserved = getMetadata().getDevice().reservedRange;
+		
+		if (reserved.isEmpty())
 			return true; // No reserved words, so force is trivially ok.
-
-		int post = getMetadata().getDevice().reservedRange.post();
-		for (int address = getMetadata().getDevice().reservedRange.start(); address < post; ++address) {
+		
+		for(int address : Po.xrange(reserved.start(), reserved.post())) {
 			if (!isAllOnes(address))
 				return true;
 		}
-
 		return false;
-	}
-
-	public void save(PylikeWritable file, boolean skipOnes) throws IOException {
-		HexFileSerializer.save(this, file, skipOnes);
-	}
-
-	public void saveCC(PylikeWritable file, boolean skipOnes) throws IOException {
-		HexFileSerializer.saveCC(this, file, skipOnes);
 	}
 
 	HexFileMetadata getMetadata() {

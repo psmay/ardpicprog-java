@@ -18,7 +18,7 @@ class HexFileSerializer {
 	private static int determineOutputExtendedAddress(HexFile hex, PylikeWritable file, int currentSegment,
 			boolean needsSegments, byte[] buffer, int segment) throws IOException {
 		if (needsSegments && segment != currentSegment) {
-			if (segment < 16 && hex.getMetadata().getFormat() != HexFile.FORMAT_IHX32) {
+			if (segment < 16 && hex.getMetadata().getFormat() != HexFileMetadata.FORMAT_IHX32) {
 				// Over 64K boundary: output an Extended Segment Address
 				// Record.
 				currentSegment = outputExtendedAddress(hex, file, buffer, segment, (byte) 0x02, 12);
@@ -88,8 +88,8 @@ class HexFileSerializer {
 		DeviceDetails device = hex.getMetadata().getDevice();
 		boolean needsSegments = (rangeIsNotShort(device.programRange) || rangeIsNotShort(device.configRange) || rangeIsNotShort(device.dataRange));
 		int formatz = hex.getMetadata().getFormat();
-		int format = (formatz == HexFile.FORMAT_AUTO && device.programBits == 16) ? HexFile.FORMAT_IHX32 : formatz;
-		if (format == HexFile.FORMAT_IHX8M)
+		int format = (formatz == HexFileMetadata.FORMAT_AUTO && device.programBits == 16) ? HexFileMetadata.FORMAT_IHX32 : formatz;
+		if (format == HexFileMetadata.FORMAT_IHX8M)
 			needsSegments = false;
 		byte[] buffer = new byte[64];
 

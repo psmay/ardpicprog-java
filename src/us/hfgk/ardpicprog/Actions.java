@@ -18,7 +18,7 @@ public class Actions {
 
 	static void doCCOutput(Str ccOutput, boolean skipOnes, HexFile hexFile) throws IOException {
 		PylikeWritable file = Po.openwb(ccOutput);
-		hexFile.saveCC(file, skipOnes);
+		HexFileSerializer.saveCC(hexFile, file, skipOnes);
 		file.close();
 	}
 
@@ -62,7 +62,7 @@ public class Actions {
 				throw e;
 			}
 
-			hexFile.save(file, skipOnes);
+			HexFileSerializer.save(hexFile, file, skipOnes);
 			file.close();
 		} finally {
 			Common.closeWarnOnError(file, log);
