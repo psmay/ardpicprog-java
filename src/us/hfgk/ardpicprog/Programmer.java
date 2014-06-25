@@ -12,6 +12,7 @@ import java.util.logging.Logger;
 
 import us.hfgk.ardpicprog.pylike.Po;
 import us.hfgk.ardpicprog.pylike.Str;
+import us.hfgk.ardpicprog.pylike.Tuple2;
 
 public class Programmer implements Closeable {
 
@@ -503,6 +504,109 @@ public class Programmer implements Closeable {
 
 	public boolean getForceCalibration() {
 		return forceCalibration;
+	}
+
+	void write(HexFile hexFile, boolean forceCalibration) throws IOException {
+		setForceCalibration(forceCalibration);
+		write(hexFile);
+	}
+
+	void write(HexFile hexFile) throws IOException {
+		write(hexFile.getMetadata().getDevice(), hexFile.getWords());
+	}
+
+	void write(DeviceDetails device, ReadableShortList data) throws IOException {
+		AddressRange programRangeForWrite = (this.getForceCalibration() || device.reservedRange.isEmpty()) ? device.programRange
+				: device.programStartToReservedStart();
+
+		// Write the contents of program memory.
+
+		this.writeArea(data, "program memory", programRangeForWrite, device.programRange.isEmpty());
+
+		// Write data memory before config memory in case the configuration
+		// word turns on data protection and thus hinders data verification.
+		this.writeArea(data, "data memory", device.dataRange, device.dataRange.isEmpty());
+
+		// Write the contents of config memory.
+		this.writeArea(data, "id words and fuses", device.configRange, device.configRange.isEmpty());
+
+		log.info("done.");
+	}
+
+	private void writeArea(ReadableShortList source, String desc, AddressRange range, boolean skip) throws IOException {
+		if (skip)
+			log.info("Skipped burning " + desc + ",");
+		else {
+			log.info("Burning " + desc + ",");
+			int writeLen = source.writeTo(this, range);
+			Programmer.reportCount(writeLen);
+		}
+	}
+
+	ReadableShortList readAreas(List<Tuple2<String, AddressRange>> areas) throws IOException {
+		ShortList dest = Common.getBlankShortList();
+
+		for (Tuple2<String, AddressRange> rd : areas) {
+			this.readArea(dest, rd);
+		}
+
+		log.info("done.");
+		return dest;
+	}
+
+	private void readArea(MutableShortList dest, Tuple2<String, AddressRange> area) throws IOException {
+		String areaDesc = area._1;
+		AddressRange range = area._2;
+		if (!range.isEmpty()) {
+			log.info("Reading " + areaDesc + ",");
+			dest.readFrom(this, range);
+		} else {
+			log.info("Skipped reading " + areaDesc + ",");
+		}
+	}
+
+	boolean blankCheckAll(HexFileMetadata metadata) throws IOException {
+		for (Tuple2<String, AddressRange> area : metadata.getAreas()) {
+			if (!this.blankCheckArea(metadata, area))
+				return false;
+		}
+		return true;
+	}
+
+	private boolean blankCheckRange(HexFileMetadata metadata, AddressRange range) throws IOException {
+		final short[] buf = this.readCopy(range);
+
+		int i = range.start();
+		for (short word : buf) {
+			if (!metadata.wouldBeAllOnes(i, word)) {
+				return false;
+			}
+			++i;
+		}
+
+		return true;
+	}
+
+	private boolean blankCheckArea(HexFileMetadata metadata, Tuple2<String, AddressRange> area) throws IOException {
+		String areaDesc = area._1;
+		AddressRange range = area._2;
+		if (!range.isEmpty()) {
+			log.info("Blank checking " + areaDesc + ",");
+			if (this.blankCheckRange(metadata, range)) {
+				log.info("Looks blank");
+				return true;
+			} else {
+				log.info("Looks non-blank");
+				return false;
+			}
+		} else {
+			log.info("Skipped blank checking " + areaDesc + ",");
+			return true;
+		}
+	}
+
+	private static void reportCount(int count) {
+		log.info((count == 1) ? " 1 location," : " " + count + " locations,");
 	}
 
 }

@@ -64,4 +64,8 @@ public class HexFileMetadata {
 
 		return Collections.unmodifiableList(ls);
 	}
+
+	public boolean wouldBeAllOnes(int address, short wordValue) {
+		return wordValue == fullWordAtAddress(address);
+	}
 }

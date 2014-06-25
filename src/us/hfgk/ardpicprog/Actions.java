@@ -13,8 +13,7 @@ public class Actions {
 	private static final Logger log = Logger.getLogger(Actions.class.getName());
 
 	static void doBurn(boolean forceCalibration, Programmer port, HexFile hexFile) throws IOException {
-		port.setForceCalibration(forceCalibration);
-		HexFile.writeTo(port, hexFile.getMetadata().getDevice(), hexFile.getWords());
+		port.write(hexFile, forceCalibration);
 	}
 
 	static void doCCOutput(Str ccOutput, boolean skipOnes, HexFile hexFile) throws IOException {
@@ -51,8 +50,7 @@ public class Actions {
 
 	static void doOutput(Str output, boolean skipOnes, Programmer port, HexFileMetadata hexMeta)
 			throws IOException, HexFileException {
-		ShortList words = Common.getBlankShortList();
-		HexFile.readFrom(words, port, hexMeta.getAreas());
+		ReadableShortList words = port.readAreas(hexMeta.getAreas());
 		HexFile hexFile = new HexFile(hexMeta, words);
 
 		PylikeWritable file = null;
@@ -73,7 +71,7 @@ public class Actions {
 
 	static void doBlankCheck(Programmer port, HexFileMetadata metadata) throws IOException {
 		log.info("Checking whether device is blank");
-		if (HexFile.blankCheckRead(metadata, port)) {
+		if (port.blankCheckAll(metadata)) {
 			log.info("Device appears to be blank");
 		} else {
 			log.info("Device appears to be NOT blank");
